@@ -9,11 +9,12 @@ import numpy as np
 class Imsrg():
 
   def __init__(self, **kwargs):
+    #TODO Clean this up to use the ImsrgParams class in utils.py
     #### Here are the default parameters for the imsrg###
     ### TODO add all IMSRG parameters in the params
     #Paths to different directories that are used
     #TODO update those from a config file
-    self.scratch_directory = '/work/submit/abelley/work/'
+    self.scratch_directory = '/work/submit/abelley/work/imsrg/'
     self.output_directory_base = '/home/submit/abelley/results/'
     self.file2b_directory = '/ceph/submit/data/group/ab-initio/me2j/'
     self.file3b_directory  = '/ceph/submit/data/group/ab-initio/me3j/'

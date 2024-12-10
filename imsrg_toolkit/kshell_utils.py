@@ -85,7 +85,7 @@ class KshellScript():
     self.path_to_kshell =  " "
     self.header = " "
     self.output_directory =  "/home/submit/abelley/results/kshell/"
-    self.scratch_directory = "/work/submit/abelley/work/"
+    self.scratch_directory = "/work/submit/abelley/work/kshell/"
     fn_snt_path = Path(fn_snt)
     self.filebase = fn_snt_path.name[:-4]
     self.fn_base = self.Nucl+ "_" + self.filebase
@@ -104,14 +104,19 @@ class KshellScript():
 class KshellWavefunctionScript(KshellScript):
   def __init__(self, fn_snt, **kwargs):
     super().__init__(fn_snt)
+    #TODO make it so we can actually pass many states as inputs
     self.states = "+1" 
     self.hw_truncation = None
     self.ph_truncation = None
-    self.snt_prm = {}
-    self.read_snt()
-    self.nf = self.element2nf()
     self.update_params(**kwargs)
-  
+    fn_ptn = self.scratch_directory + self.fn_base
+    if "+" in self.states:
+      fn_ptn += "_p"
+    elif "-" in self.states:
+      fn_ptn += "_n"
+    fn_ptn += ".ptn"
+    self.fn_ptn = fn_ptn
+    
 
   def read_comment_skip(self, fp):
     while 1:
@@ -281,14 +286,10 @@ class KshellWavefunctionScript(KshellScript):
 
   def gen_partition(self, parity):
     #parity : "1" or "-1" 
+    self.snt_prm = {}
+    self.read_snt()
+    self.nf = self.element2nf()
     from imsrg_toolkit import gen_partition
-    fn_ptn = self.scratch_directory + self.fn_base
-    if parity == 1:
-      fn_ptn += "_p"
-    elif parity == -1 :
-      fn_ptn += "_n"
-    fn_ptn += ".ptn"
-    self.fn_ptn = fn_ptn
     if self.hw_truncation == None and self.ph_truncation == None:
       tmod = 0
       truncation_params = None
@@ -300,7 +301,7 @@ class KshellWavefunctionScript(KshellScript):
       tmod = 2
       truncation_params = self.hw_truncation
     #TODO add other options for the truncations of the model space
-    gen_partition.main(self.fn_snt, fn_ptn, self.nf, parity, tmod, truncation_params)
+    gen_partition.main(self.fn_snt, self.fn_ptn, self.nf, parity, tmod, truncation_params)
 
 
   def gen_script(self, gen_partition = False):
@@ -450,31 +451,31 @@ class KshellToolkit():
     self.outputs = []
     
 
-  def gen_partition(self, parity, ket=True):
+  def gen_partition(self, ket=True):
     if ket:
+      if state_string(self.state_list[-1], self.A)[-1] == 'p': 
+        parity = 1
+      else:
+        parity = -1
       self.kshell_ket.gen_partition(parity)
     else:
+      if state_string(self.state_list[0], self.A)[-1] == 'p': 
+        parity = 1
+      else:
+        parity = -1
       self.kshell_bra.gen_parititon(parity)
 
 
   def submit_diag(self, gen_partition=True, previous_jobid = -1, verbose = False):
     if gen_partition:
-      if state_string(self.state_list[-1], self.A)[-1] == 'p': 
-        parity = 1
-      else:
-        parity = -1
-      self.gen_partition(parity)
+      self.gen_partition()
     ket_sh = self.kshell_ket.gen_script()
     jobid_ket = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', ket_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
     if verbose:
       print(f'Submitted ket diagonalization with jobid {jobid_ket}')
     if self.Nucl != self.Nucl_daughter:
       if gen_partition:
-        if state_string(self.state_list[0], self.A_daughter)[-1] == 'p': 
-          parity = 1
-        else:
-          parity = -1
-        self.gen_partition(parity, ket=False)
+        self.gen_partition(ket=False)
       bra_sh = self.kshell_bra.gen_script()
       jobid_bra = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', bra_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
       if verbose: 
@@ -536,7 +537,13 @@ class KshellToolkit():
     self.df.columns = ["fn_op", "Nucl bra","J bra","P bra","n bra","Energy bra","Nucl ket","J ket","P ket","n ket","Energy ket","Zero","One","Two"]
 
 
-  def gen_expvals_script(self, fn_ops, ops_rankJ=None, ops_rankP=None, ops_rankZ=None, header=None):
+  def write_outputs_to_file(self, fn_output):
+    self.gen_df_from_outputs()
+    self.df.to_csv(fn_output)
+
+
+
+  def gen_expvals_script(self, fn_output, fn_ops, ops_rankJ=None, ops_rankP=None, ops_rankZ=None, header=None):
     if ops_rankJ == None:
       ops_rankJ = [0 for _ in  fn_ops]
     if ops_rankP == None:
@@ -547,8 +554,8 @@ class KshellToolkit():
     fn_eval = self.kshell_bra.scratch_directory+self.kshell_bra.filebase+"_eval.py"
     eval_script = "#!/usr/bin/env python3\n"
     if header != None:
-      evals_script += f"{header}\n"
-    eval_script += "from imsrg_toolkit.kshell_utils import kshell_toolkit\n"
+      eval_script += f"{header}\n"
+    eval_script += "from imsrg_toolkit.kshell_utils import KshellToolkit\n"
     eval_script += "params = {\n"
     for key, value in self.params.items():
       if key == 'header' or key == 'run_cmd' : continue
@@ -557,10 +564,10 @@ class KshellToolkit():
       else:
         eval_script += f"\t '{key}': {value},\n"
     eval_script+='}\n'
-    eval_script += f"vals = kshell_toolkit('{self.fn_snt}', '{self.Nucl}', {self.state_list}, **params)\n"
+    eval_script += f"vals = KshellToolkit('{self.fn_snt}', '{self.Nucl}', {self.state_list}, **params)\n"
     for op, op_rankJ, op_rankP, op_rankZ  in zip(fn_ops, ops_rankJ, ops_rankP, ops_rankZ):
       eval_script += f"vals.calc_opexpvals('{op}', op_rankJ = {op_rankJ}, op_rankP = {op_rankP}, op_rankZ = {op_rankZ})\n"
-    eval_script += "vals.gen_df_from_outputs()"
+    eval_script += f"vals.write_outputs_to_file('{fn_output}')"
     f = open(fn_eval, "w")
     f.write(eval_script)
     f.close()
@@ -568,21 +575,21 @@ class KshellToolkit():
     return fn_eval
 
 
-  def submit_expvals(self, fn_ops, ops_rankJ=None, ops_rankP=None, ops_rankZ=None,  previous_jobid = -1, verbose = False, header=None):
-    fn_sh = self.gen_expvals_script(fn_ops,  ops_rankJ=ops_rankJ, ops_rankP=ops_rankP, ops_rankZ=ops_rankZ, header = header)
+  def submit_expvals(self, fn_output, fn_ops, ops_rankJ=None, ops_rankP=None, ops_rankZ=None,  previous_jobid = -1, verbose = False, header=None):
+    fn_sh = self.gen_expvals_script(fn_output, fn_ops,  ops_rankJ=ops_rankJ, ops_rankP=ops_rankP, ops_rankZ=ops_rankZ, header = header)
     jobid = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', fn_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
     if verbose:
       print(f'Submitted expvals with jobid {jobid}')
     return jobid
 
 
-  def submit_all(self, fn_ops = [], ops_rankJ=None, ops_rankP=None, ops_rankZ=None,  previous_jobid = -1, verbose = False, header=None):
+  def submit_all(self, fn_output, fn_ops = [], ops_rankJ=None, ops_rankP=None, ops_rankZ=None, gen_partition=False,  previous_jobid = -1, verbose = False, header=None):
     os.chdir(self.kshell_ket.scratch_directory)
     #Submit the diagonalization
-    diag_ids = self.submit_diag(previous_jobid=previous_jobid, verbose = verbose)
+    diag_ids = self.submit_diag(previous_jobid=previous_jobid, verbose = verbose, gen_partition = gen_partition)
     #Submit the density
     density_id = self.submit_density(previous_jobids = diag_ids,  verbose = verbose)
     if len(fn_ops) > 0:
       #Submit the exp vals calculations
-      self.submit_expvals(fn_ops, ops_rankJ = ops_rankJ, ops_rankP = ops_rankP, ops_rankZ = ops_rankZ, previous_jobid = density_id, verbose=verbose, header=header)
+      self.submit_expvals(fn_output, fn_ops, ops_rankJ = ops_rankJ, ops_rankP = ops_rankP, ops_rankZ = ops_rankZ, previous_jobid = density_id, verbose=verbose, header=header)
     
