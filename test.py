@@ -7,8 +7,8 @@ import numpy as np
 
 
 imsrg_params = {}
-imsrg_params['emax'] = 2
-imsrg_params['E3max'] = 6
+imsrg_params['emax'] = 8
+imsrg_params['E3max'] = 24
 imsrg_params['hw'] = 10
 imsrg_params['A'] = 6
 imsrg_params['opnames'] = ['Rp2']
@@ -22,7 +22,8 @@ imsrg_params['header'] = """#!/bin/bash
 #SBATCH --cpus-per-task=24
 #SBATCH --output=/work/submit/abelley/results/imsrg_log/outputs/test_out_%j.txt
 #SBATCH --error=/work/submit/abelley/results/imsrg_log/errors/test_err_%j.txt
-#SBATCH --time=10:00
+#SBATCH --time=03:00:00
+#SBATCH --mem=64G
 
 cd $SLURM_SUBMIT_DIR
 export OMP_NUM_THREADS=24
@@ -62,10 +63,10 @@ header_expvals = """#SBATCH --output=/work/submit/abelley/results/kshell_log/out
 
 imsrg_submit = Utils("He6", ["+1", "+1"], imsrg_params, kshell_params)
 # imsrg_submit.submit_imsrg("TwBME-HO_NN-only_N3LO_EM500_srg1.80_hw16_emax18_e2max36.me2j.gz","NO2B_half_ThBME_EM1.8_2.0_3NFJmax15_IS_hw16_ms16_32_28.stream.bin", verbose=True)
-# imsrg_submit.submit_imsrg_combine_delta(LECs, 2007, verbose=True)
-imsrg_submit.submit_all("TwBME-HO_NN-only_N3LO_EM500_srg1.80_hw16_emax18_e2max36.me2j.gz",
-  "NO2B_half_ThBME_EM1.8_2.0_3NFJmax15_IS_hw16_ms16_32_28.stream.bin", 
-  verbose=True, header_expvals = header_expvals)
+imsrg_submit.submit_all_combine_delta(LECs, 2007, 'test.csv', verbose=True)
+# imsrg_submit.submit_all("TwBME-HO_NN-only_N3LO_EM500_srg1.80_hw16_emax18_e2max36.me2j.gz",
+#   "NO2B_half_ThBME_EM1.8_2.0_3NFJmax15_IS_hw16_ms16_32_28.stream.bin", 
+#   verbose=True, header_expvals = header_expvals)
 
 
 

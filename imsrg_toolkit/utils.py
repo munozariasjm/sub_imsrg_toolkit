@@ -202,12 +202,12 @@ class Utils():
     return self.submit_job(fn_sh, verbose=verbose)
 
 
-  def submit_all(self, file2b, file3b, ops_rankJ=None, ops_rankP=None, ops_rankZ=None,  header_expvals=None, verbose=False):
+  def submit_all(self, file2b, file3b, fn_output, ops_rankJ=None, ops_rankP=None, ops_rankZ=None,  header_expvals=None, verbose=False):
     imsrg_id = self.submit_imsrg(file2b, file3b, verbose=verbose)
     fn_ops = [f"{self.output_dir}{self.filebase}_{op}.snt" for op in self.opnames]
-    self.kshell.submit_all('test.csv', fn_ops, previous_jobid = imsrg_id, ops_rankJ = ops_rankJ, ops_rankP = ops_rankP, ops_rankZ = ops_rankZ, header = header_expvals, verbose=verbose)
+    self.kshell.submit_all(fn_output, fn_ops, previous_jobid = imsrg_id, ops_rankJ = ops_rankJ, ops_rankP = ops_rankP, ops_rankZ = ops_rankZ, header = header_expvals, verbose=verbose)
 
-  def submit_all_combine_delta(self, LECs, sampleID, ops_rankJ=None, ops_rankP=None, ops_rankZ=None,  header_expvals=None, verbose=False):
+  def submit_all_combine_delta(self, LECs, sampleID, fn_output, ops_rankJ=None, ops_rankP=None, ops_rankZ=None,  header_expvals=None, verbose=False):
     imsrg_id = self.submit_imsrg(LECs, sampleID, verbose=verbose)
     fn_ops = [f"{self.output_dir}{self.filebase}_{op}.snt" for op in self.opnames]
-    self.kshell.submit_all('test.csv', fn_ops, previous_jobid = imsrg_id, ops_rankJ = ops_rankJ, ops_rankP = ops_rankP, ops_rankZ = ops_rankZ, header = header_expvals, verbose=verbose)
+    self.kshell.submit_all(fn_output, fn_ops, previous_jobid = imsrg_id, ops_rankJ = ops_rankJ, ops_rankP = ops_rankP, ops_rankZ = ops_rankZ, header = header_expvals, verbose=verbose)
