@@ -80,10 +80,10 @@ class ImsrgParams():
 
 
 class Utils():
-  def __init__(self, Nucl, state_list, imsrg_params, kshell_params,  Nucl_daughter=None, submit_cmd='sbatch', module_path = "/work/submit/abelley/imsrg_toolkit/"):
+  def __init__(self, Nucl, state_list, imsrg_params, kshell_params, SampleID=None, Nucl_daughter=None, submit_cmd='sbatch', module_path = "/work/submit/abelley/imsrg_toolkit/"):
     self.imsrg_params = imsrg_params
     self.module_path = module_path
-    pars = ImsrgParams(**imsrg_params)
+    pars = ImsrgParams(SampleID,**imsrg_params)
     fn_snt = pars.intfile
     self.opnames = pars.opnames
     self.output_dir = pars.output_dir
@@ -198,7 +198,6 @@ class Utils():
 
   def submit_imsrg_combine_delta(self, LECs, sampleID, verbose = True):
     fn_sh = self.gen_imsrg_submit_script_combine_delta(LECs, sampleID)
-    jobid = run([self.submit_cmd, '--parsable', fn_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
     return self.submit_job(fn_sh, verbose=verbose)
 
 

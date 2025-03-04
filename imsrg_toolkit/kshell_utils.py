@@ -79,13 +79,13 @@ def _str_J_to_Jfloat(string):
 
 
 class KshellScript():
-  def __init__(self, fn_snt):
+  def __init__(self, fn_snt, **kwargs):
     self.Nucl = "He6"
     self.Z, self.N, self.A = _ZNA_from_str(self.Nucl)
-    self.path_to_kshell =  " "
     self.header = " "
     self.output_directory =  "/home/submit/abelley/results/kshell/"
     self.scratch_directory = "/work/submit/abelley/work/kshell/"
+    self.update_params(**kwargs)
     fn_snt_path = Path(fn_snt)
     self.filebase = fn_snt_path.name[:-4]
     self.fn_base = self.Nucl+ "_" + self.filebase
@@ -103,7 +103,7 @@ class KshellScript():
 
 class KshellWavefunctionScript(KshellScript):
   def __init__(self, fn_snt, **kwargs):
-    super().__init__(fn_snt)
+    super().__init__(fn_snt, **kwargs)
     #TODO make it so we can actually pass many states as inputs
     self.states = "+1" 
     self.hw_truncation = None
@@ -201,8 +201,8 @@ class KshellWavefunctionScript(KshellScript):
         print( '*** ERROR: nuclide out of model space ***' )
         return False
     return (nf1, nf2)
-
-
+    
+  
   def get_occupation(self, hw_ex=False):
     H = Operator()
     H.read_operator_file(self.fn_snt,A=self.A)
@@ -215,56 +215,44 @@ class KshellWavefunctionScript(KshellScript):
     e_data = {}
     Njpi = {}
     for log in logs:
-        if(not os.path.exists(log)):
-            print(f"{log} is not found")
-            continue
-        f = open(log,"r")
-        while True:
-            line = f.readline()
-            if(not line): break
-            dat = line.split()
-            if(len(dat) < 2): continue
-            if(dat[1] == "<H>:"):
-                dat = line.split()
-                n_eig= int(dat[0])
-                ene  = float(dat[2]) + H.get_0bme()
-                mtot = int(dat[6][:-2])
-                J = dat[6]
-                if(self.A%2==0): J = str(int(dat[6][:-2])//2)
-                prty = int(dat[8])
-                if(not (J,prty) in Njpi): Njpi[(J,prty)]=1
-                else: Njpi[(J,prty)]+=1
-                hws = None
-                while ene in e_data: ene += 0.000001
-                line = f.readline()
-                dat = line.split()
-                if(dat[0]=="<Hcm>:"): tt = int(dat[5][:-2])
-                if(dat[0]=="<TT>:"): tt = int(dat[3][:-2])
-                line = f.readline()
-                data = line.split()
-                if(line[0:7] ==" <p Nj>"):
-                    plist = []
-                    for i in range(len(data)-2):
-                        plist.append(float(data[i+2]))
-                line = f.readline()
-                data = line.split()
-                if(line[0:7] ==" <n Nj>"):
-                    nlist = []
-                    for i in range(len(data)-2):
-                        nlist.append(float(data[i+2]))
-                if(hw_ex):
-                    while len(line)!=0:
-                        line = f.readline()
-                        data = line.split()
-                        if(line[0:4] ==" hw:"):
-                            hws = {}
-                            for i in range(len(data)-1):
-                                hw, prob = data[i+1].split(":")
-                                hws[int(hw)] = float(prob)
-                            break
-                if(hws!=None): e_data[ (J,prty,Njpi[(J,prty)]) ] = (ene, log, tt, plist, nlist, hws)
-                if(hws==None): e_data[ (J,prty,Njpi[(J,prty)]) ] = (ene, log, tt, plist, nlist)
-        f.close()
+      if(not os.path.exists(log)):
+        print(f"{log} is not found")
+        continue
+      with open(log) as f:
+        for line in f:
+          line = line.strip()
+          dat = line.split()
+          if line.startswith("1  <H>:"):
+            n_eig= int(dat[0])
+            ene  = float(dat[2]) + H.get_0bme()
+            mtot = int(dat[6][:-2])
+            J = dat[6]
+            if(self.A%2==0): J = str(int(dat[6][:-2])//2)
+            prty = int(dat[8])
+            if(not (J,prty) in Njpi): Njpi[(J,prty)]=1
+            else: Njpi[(J,prty)]+=1
+            hws = None
+            while ene in e_data: ene += 0.000001
+          elif line.startswith("<Hcm>:"):
+            tt = int(dat[5][:-2])
+          elif line.startswith("<TT>:"):
+            tt = int(dat[3][:-2])
+          elif line.startswith("<p Nj>"):
+            plist = []
+            for i in range(len(dat)-2):
+              plist.append(float(dat[i+2]))
+          elif line.startswith("<n Nj>"):
+              nlist = []
+              for i in range(len(dat)-2):
+                  nlist.append(float(dat[i+2]))
+          if(hw_ex):
+            if line.startswith("hw:"):
+              hws = {}
+              for i in range(len(dat)-1):
+                hw, prob = dat[i+1].split(":")
+                hws[int(hw)] = float(prob)
+      if(hws!=None): e_data[ (J,prty,Njpi[(J,prty)]) ] = (ene, log, tt, plist, nlist, hws)
+      else: e_data[ (J,prty,Njpi[(J,prty)]) ] = (ene, log, tt, plist, nlist)
     return e_data
 
 
@@ -345,7 +333,7 @@ class KshellWavefunctionScript(KshellScript):
     """)
     s+= f"{self.run_cmd} ./kshell.exe {self.fn_base}_{str_state}.input > log_{self.fn_base}_{str_state}.txt 2>&1\n" 
     s+= dedent(f"""
-      rm -f tmp_snapshot_{Path(self.fn_ptn).name}_0_* tmp_lv_{Path(self.fn_ptn).name}_0_* {self.fn_base}_{str_state}.input 
+      rm -f tmp_snapshot_*{Path(self.fn_ptn).name}_0_* tmp_lv_*{Path(self.fn_ptn).name}_0_* {self.fn_base}_{str_state}.input 
 
       ./collect_logs.py log_*{self.fn_base}* > summary_{self.fn_base}.txt
       cp summary_{self.fn_base}.txt {self.output_directory}
@@ -387,8 +375,9 @@ class KshellWavefunctionScript(KshellScript):
 
 class KshellDensityScript(KshellScript):
   def __init__(self, fn_snt, Nucl_daughter=None, **kwargs):
-    super().__init__(fn_snt)
+    super().__init__(fn_snt, **kwargs)
     self.state_list = ["+1", "+1"]
+    self.update_params(**kwargs)
     if Nucl_daughter == None:
       self.Nucl_daughter = self.Nucl
     else:
@@ -396,7 +385,7 @@ class KshellDensityScript(KshellScript):
     self.Z_daughter, self.N_daughter, self.A_daughter = _ZNA_from_str(self.Nucl_daughter)
     self.fn_script = f"{self.scratch_directory}/density_{self.filebase}_{self.Nucl_daughter}{state_string(self.state_list[1], self.A_daughter)}_{self.Nucl}{state_string(self.state_list[0], self.A)}.sh"
     self.fn_density = f"{self.scratch_directory}/density_{self.filebase}_{self.Nucl_daughter}{state_string(self.state_list[1], self.A_daughter)}_{self.Nucl}{state_string(self.state_list[0], self.A)}.txt"
-    self.update_params(**kwargs)
+    
     
 
   def gen_script(self, fn_ptn, fn_ptn_daughter=None):
@@ -470,14 +459,14 @@ class KshellToolkit():
     if gen_partition:
       self.gen_partition()
     ket_sh = self.kshell_ket.gen_script()
-    jobid_ket = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', ket_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
+    jobid_ket = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', '--kill-on-invalid-dep=yes', ket_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
     if verbose:
       print(f'Submitted ket diagonalization with jobid {jobid_ket}')
     if self.Nucl != self.Nucl_daughter:
       if gen_partition:
         self.gen_partition(ket=False)
       bra_sh = self.kshell_bra.gen_script()
-      jobid_bra = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', bra_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
+      jobid_bra = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', '--kill-on-invalid-dep=yes', bra_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
       if verbose: 
         print(f'Submitted bra diagonalization with jobid {jobid_bra}')
       return [jobid_bra, jobid_ket]
@@ -492,7 +481,7 @@ class KshellToolkit():
       fn_sh = self.density_script.gen_script(self.kshell_ket.fn_ptn, self.kshell_bra.fn_ptn)
     if previous_jobids != -1:
       previous_jobids = ':'.join(map(str, previous_jobids))
-    jobid_density = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobids}', fn_sh], stdout=PIPE, text=True).stdout.rstrip()
+    jobid_density = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobids}','--kill-on-invalid-dep=yes', fn_sh], stdout=PIPE, text=True).stdout.rstrip()
     # else:
     #   jobid_density = run([self.submit_cmd, '--parsable', fn_sh], stdout=PIPE, text=True).stdout
     if verbose:
@@ -577,7 +566,7 @@ class KshellToolkit():
 
   def submit_expvals(self, fn_output, fn_ops, ops_rankJ=None, ops_rankP=None, ops_rankZ=None,  previous_jobid = -1, verbose = False, header=None):
     fn_sh = self.gen_expvals_script(fn_output, fn_ops,  ops_rankJ=ops_rankJ, ops_rankP=ops_rankP, ops_rankZ=ops_rankZ, header = header)
-    jobid = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', fn_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
+    jobid = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', '--kill-on-invalid-dep=yes', fn_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
     if verbose:
       print(f'Submitted expvals with jobid {jobid}')
     return jobid
