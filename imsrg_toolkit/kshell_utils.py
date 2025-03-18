@@ -379,6 +379,8 @@ class KshellDensityScript(KshellScript):
     super().__init__(fn_snt, **kwargs)
     self.state_list = ["+1", "+1"]
     self.update_params(**kwargs)
+    Path(self.output_directory).mkdir(parents=True, exist_ok=True)
+    Path(self.scratch_directory).mkdir(parents=True, exist_ok=True)
     if Nucl_daughter == None:
       self.Nucl_daughter = self.Nucl
     else:
