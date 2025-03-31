@@ -3,7 +3,7 @@ from pathlib import Path
 import os
 from subprocess import run, PIPE
 
-from imsrg_toolkit.settings import username
+from imsrg_toolkit.settings import username, ROOT_DIR
 
 class ImsrgParams():
   def __init__(self, sampleID = None, **kwargs):
@@ -80,9 +80,10 @@ class ImsrgParams():
 
 
 class Utils():
-  def __init__(self, Nucl, state_list, imsrg_params, kshell_params, SampleID=None, Nucl_daughter=None, submit_cmd='sbatch', module_path = f"/work/submit/{username}/imsrg_toolkit/"):
+  def __init__(self, Nucl, state_list, imsrg_params, kshell_params, SampleID=None, Nucl_daughter=None, submit_cmd='sbatch', HF=False):
     self.imsrg_params = imsrg_params
-    self.module_path = module_path
+    self.HF = HF
+    self.module_path = ROOT_DIR
     pars = ImsrgParams(SampleID,**imsrg_params)
     fn_snt = pars.intfile
     self.opnames = pars.opnames
@@ -90,12 +91,15 @@ class Utils():
     self.output_dir = pars.output_dir
     fn_snt_path = Path(fn_snt)
     self.submit_cmd = submit_cmd
+    if HF:
+      fn_snt = fn_snt+"_HF"
     self.fn_snt = fn_snt+".snt"
     self.kshell = KshellToolkit(self.fn_snt, Nucl, state_list, Nucl_daughter=Nucl_daughter, submit_cmd=submit_cmd,  **kshell_params)
     self.filebase = fn_snt_path.name
     self.fn_py = self.filebase+".py"
     self.fn_sh = self.filebase+".sh"
     self.scratch_directory = f'/work/submit/{username}/work/imsrg/'
+
 
   def write_script_header(self):
     script = "#!/usr/bin/env python3\n"
@@ -128,7 +132,7 @@ class Utils():
   def gen_imsrg_python_script(self, file2b, file3b):
     fn_pyimsrg = self.scratch_directory+self.fn_py
     script = self.write_script_header()
-    script += f"imsrg.run('{file2b}', '{file3b}')\n"
+    script += f"imsrg.run('{file2b}', '{file3b}', HF = {self.HF})\n"
     script = self.add_kshell_partition(script)
     f = open(fn_pyimsrg, "w")
     f.write(script)
@@ -140,7 +144,7 @@ class Utils():
   def gen_imsrg_python_script_combine_delta(self, LECs, sampleID):
     fn_pyimsrg = self.scratch_directory+self.fn_py
     script = self.write_script_header()
-    script += f"imsrg.run_combine_delta({LECs}, {sampleID})\n"
+    script += f"imsrg.run_combine_delta({LECs}, {sampleID},  HF = {self.HF})\n"
     script = self.add_kshell_partition(script)
     f = open(fn_pyimsrg, "w")
     f.write(script)
@@ -148,19 +152,31 @@ class Utils():
     os.chmod(fn_pyimsrg, 0o755)
     return fn_pyimsrg
 
+
   def add_kshell_partition (self, script):
-    script += (f"kshell = KshellToolkit(imsrg.intfile+'.snt', "
-    f"Nucl = '{self.kshell.Nucl}', "
-    f"state_list={self.kshell.state_list}, ")
-    if self.kshell.Nucl_daughter != self.kshell.Nucl:
-      script += f"Nucl_daughter='{self.kshell.Nucl_daughter}', "
-    script += (f"submit_cmd='{self.kshell.submit_cmd}', "
-    f"**{self.kshell.params})\n"
-    )
+    if self.HF:
+      script += (f"kshell = KshellToolkit(imsrg.intfile+'_HF.snt', "
+      f"Nucl = '{self.kshell.Nucl}', "
+      f"state_list={self.kshell.state_list}, ")
+      if self.kshell.Nucl_daughter != self.kshell.Nucl:
+        script += f"Nucl_daughter='{self.kshell.Nucl_daughter}', "
+      script += (f"submit_cmd='{self.kshell.submit_cmd}', "
+      f"**{self.kshell.params})\n"
+      )
+    else:
+      script += (f"kshell = KshellToolkit(imsrg.intfile+'.snt', "
+      f"Nucl = '{self.kshell.Nucl}', "
+      f"state_list={self.kshell.state_list}, ")
+      if self.kshell.Nucl_daughter != self.kshell.Nucl:
+        script += f"Nucl_daughter='{self.kshell.Nucl_daughter}', "
+      script += (f"submit_cmd='{self.kshell.submit_cmd}', "
+      f"**{self.kshell.params})\n"
+      )
     script += "kshell.gen_partition()\n"
     if self.kshell.Nucl != self.kshell.Nucl_daughter:
       script += "kshell.gen_partition(ket=False)\n"
     return script
+
 
   def write_submission_script(self, fn_script, file):
     submit_script = f"{self.imsrg_params['header']}\n"
@@ -202,16 +218,27 @@ class Utils():
     return self.submit_job(fn_sh, verbose=verbose)
 
 
+  def gen_oplist(self):
+    if self.HF:
+      fn_ops = [f"{self.output_dir}{self.filebase}_{op}_HF.snt" for op in self.opnames]
+    else:
+      fn_ops = [f"{self.output_dir}{self.filebase}_{op}.snt" for op in self.opnames]
+    if len(self.opfiles) > 0 :
+      if self.HF:
+        tmp = [f"{self.output_dir}{self.filebase}_{op[1]}_HF.snt" for op in self.opfiles]
+      else:
+        fn_ops = [f"{self.output_dir}{self.filebase}_{op[1]}.snt" for op in self.opfiles]
+      fn_ops.extend(tmp)
+    return fn_ops
+
+
   def submit_all(self, file2b, file3b, fn_output, ops_rankJ=None, ops_rankP=None, ops_rankZ=None,  header_expvals=None, verbose=False):
     imsrg_id = self.submit_imsrg(file2b, file3b, verbose=verbose)
-    fn_ops = [f"{self.output_dir}{self.filebase}_{op}.snt" for op in self.opnames]
-    if len(self.opfiles) > 0 :
-      tmp = [f'{self.output_dir}{self.filebase}_{op[1]}.snt' for op in self.opfiles]
-      fn_ops.extend(tmp)
+    fn_ops = self.gen_oplist()
     self.kshell.submit_all(fn_output, fn_ops, previous_jobid = imsrg_id, ops_rankJ = ops_rankJ, ops_rankP = ops_rankP, ops_rankZ = ops_rankZ, header = header_expvals, verbose=verbose)
 
 
   def submit_all_combine_delta(self, LECs, sampleID, fn_output, ops_rankJ=None, ops_rankP=None, ops_rankZ=None,  header_expvals=None, verbose=False):
     imsrg_id = self.submit_imsrg_combine_delta(LECs, sampleID, verbose=verbose)
-    fn_ops = [f"{self.output_dir}{self.filebase}_{op}.snt" for op in self.op_strings]
+    fn_ops = self.gen_oplist()
     self.kshell.submit_all(fn_output, fn_ops, previous_jobid = imsrg_id, ops_rankJ = ops_rankJ, ops_rankP = ops_rankP, ops_rankZ = ops_rankZ, header = header_expvals, verbose=verbose)

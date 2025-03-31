@@ -19,6 +19,7 @@ class Imsrg():
     self.output_directory_base = f'/home/submit/{username}/results/'
     self.file2b_directory = '/ceph/submit/data/group/ab-initio/me2j/'
     self.file3b_directory  = '/ceph/submit/data/group/ab-initio/me3j/'
+    
 
     # Model space parameters
     self.A = 6
@@ -65,6 +66,10 @@ class Imsrg():
     #If dictionay is given, update the attributes using the
     #dictionary keys and values.
     self.update_params(**kwargs)
+
+    self.output_dir = f"{self.output_directory_base}/{self.ref}/{self.label}/"
+    Path(self.scratch_directory).mkdir(parents=True, exist_ok=True)
+    Path(self.output_dir).mkdir(parents=True, exist_ok=True)
 
 
   def update_params(self, **kwargs):
@@ -226,7 +231,7 @@ class Imsrg():
       self.rw.WriteTensorTokyo(filename,op)
 
 
-  def evolve_operators(self):
+  def evolve_operators(self, HF=False):
     self.ops = []
     self.op_strings = [] #Name at the end of the snt file
     if len(self.opnames) != 0:
@@ -245,11 +250,13 @@ class Imsrg():
         print(f"Writing HO operators to {self.output_dir}")
         self.write_op_to_file(op, name, extra = "HO")
       op = self.hf.TransformToHFBasis(op)
-      if self.write_HF_ops:
+      if self.write_HF_ops or HF:
         op = op.DoNormalOrderingCore()
         print(f"Writing HF operators to {self.output_dir}")
         self.write_op_to_file(op, name, extra = "HF")
-        op = op.UndoNormalOrdering()
+        if HF:
+          return
+        op = op.UndoNormalOrderingCore()
       op = op.DoNormalOrdering()
       op = self.imsrgsolver.Transform(op)
       op = op.UndoNormalOrdering()
@@ -282,7 +289,7 @@ class Imsrg():
     return HNO
 
 
-  def run(self, file2b, file3b):
+  def run(self, file2b, file3b, HF=False):
     #Initiate the ReadWrite class to access files
     self.rw = ReadWrite()
 
@@ -297,23 +304,31 @@ class Imsrg():
     self.hf.Solve()
     HNO = self.hf.GetNormalOrderedH(2)
 
-    #Give estimate with perturbation theory to make sure everything is ok
-    self.print_estimatePT(HNO)
+    #If we only want the HF results, stop the calculation of the interacion here
+    if HF:
+      HNO = HNO.DoNormalOrderingCore()
+      print(f'Writing output file to {self.output_dir}')
+      self.gen_filebase()
+      self.intfile = f"{self.output_dir}/{self.filebase}"
+      self.rw.WriteTokyo(HNO,self.intfile+"_HF.snt", "")
+      stdout.flush()
+    else:
+      #Give estimate with perturbation theory to make sure everything is ok
+      self.print_estimatePT(HNO)
 
-    #Do the IMSRG evolution of the Hamiltonian
-    HNO = self.evolve_Hamiltonian(HNO)
+      #Do the IMSRG evolution of the Hamiltonian
+      HNO = self.evolve_Hamiltonian(HNO)
 
-    # Write things to disk
-    self.output_dir = f"{self.output_directory_base}/{self.ref}/{self.label}/"
-    Path(self.output_dir).mkdir(parents=True, exist_ok=True)
-    print(f'Writing output file to {self.output_dir}')
-    self.gen_filebase()
-    self.intfile = f"{self.output_dir}/{self.filebase}"
-    self.rw.WriteTokyo(HNO,self.intfile+".snt", "")
-    stdout.flush()
+      # Write things to disk
+    
+      print(f'Writing output file to {self.output_dir}')
+      self.gen_filebase()
+      self.intfile = f"{self.output_dir}/{self.filebase}"
+      self.rw.WriteTokyo(HNO,self.intfile+".snt", "")
+      stdout.flush()
 
     # Evolve operators
-    self.evolve_operators()
+    self.evolve_operators(HF=HF)
 
     # # #Write_kshell_jobs to be submitted after the imsrg has ran
     # for states in params["state_lists"]:
@@ -322,7 +337,7 @@ class Imsrg():
     #     kshl_l, f_diag_l = write_kshell_diag(params['path_to_kshell'], intfile+".snt", params['Nucl_daughter'], params['hw_truncation'], params['ph_truncation'], params['header'], gen_partition=True, states=states[1])
 
 
-  def run_combine_delta(self, LECs, sampleID):
+  def run_combine_delta(self, LECs, sampleID, HF=False):
     #Initiate the ReadWrite class to access files
     self.rw = ReadWrite()
 
@@ -337,23 +352,33 @@ class Imsrg():
     self.hf.Solve()
     HNO = self.hf.GetNormalOrderedH(2)
 
-    #Give estimate with perturbation theory to make sure everything is ok
-    self.print_estimatePT(HNO)
+    if HF:
+      HNO = HNO.DoNormalOrderingCore()
+      Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+      print(f'Writing output file to {self.output_dir}')
+      self.gen_filebase()
+      self.intfile = f"{self.output_dir}/{self.filebase}"
+      self.rw.WriteTokyo(HNO,self.intfile+"_HF.snt", "")
+      stdout.flush()
+    
+    else:
+      #Give estimate with perturbation theory to make sure everything is ok
+      self.print_estimatePT(HNO)
 
-    #Do the IMSRG evolution of the Hamiltonian
-    HNO = self.evolve_Hamiltonian(HNO)
+      #Do the IMSRG evolution of the Hamiltonian
+      HNO = self.evolve_Hamiltonian(HNO)
 
-    # Write things to disk
-    self.output_dir = f"{self.output_directory_base}/{self.ref}/{self.label}/"
-    Path(self.output_dir).mkdir(parents=True, exist_ok=True)
-    print(f'Writing output file to {self.output_dir}')
-    self.gen_filebase(sampleID)
-    self.intfile = f"{self.output_dir}/{self.filebase}"
-    self.rw.WriteTokyo(HNO,self.intfile+".snt", "")
-    stdout.flush()
+      # Write things to disk
+      self.output_dir = f"{self.output_directory_base}/{self.ref}/{self.label}/"
+      Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+      print(f'Writing output file to {self.output_dir}')
+      self.gen_filebase(sampleID)
+      self.intfile = f"{self.output_dir}/{self.filebase}"
+      self.rw.WriteTokyo(HNO,self.intfile+".snt", "")
+      stdout.flush()
 
     # Evolve operators
-    self.evolve_operators()
+    self.evolve_operators(HF=HF)
 
 
   def gen_filebase(self, sampleID = None):

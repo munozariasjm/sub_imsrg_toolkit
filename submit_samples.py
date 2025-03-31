@@ -2,10 +2,11 @@ import sys
 # from imsrg_toolkit.imsrg import Imsrg
 from imsrg_toolkit.kshell_utils import KshellWavefunctionScript, KshellDensityScript, KshellToolkit
 from imsrg_toolkit.utils import Utils
-from imsrg_toolkit.settings import username
+from imsrg_toolkit.settings import username, ROOT_DIR
 import numpy as np
 import pandas as pd
 import os
+from pathlib import PATH
 
 #for O14
 #emax=4 can request 2min with 256M and it is more than enough
@@ -18,8 +19,10 @@ import os
 emax = [4,]
 time = ["00:10:00"]
 memory = ['1G',]
-log_file = f"/work/submit/{username}/_results/imsrg/out.txt"
-error_file = f"/work/submit/{username}/_results/imsrg/err.txt"
+imsrg_log_path = f"/work/submit/{username}/results/imsrg_log/outputs/"
+imsrg_error_path = f"/work/submit/{username}/results/imsrg_log/errors/"
+kshell_log_path = f"/work/submit/{username}/results/kshell_log/outputs/"
+kshell_error_path = f"/work/submit/{username}/results/kshell_log/errors/"
 mass =  [16]
 Nucleus = "O"
 
@@ -28,10 +31,10 @@ state = "+1"
 num_samples = 1
 ###########################################################
 # If the paths dont exist, create them
-if not os.path.exists(log_file.split("out.txt")[0]):
-  os.makedirs(log_file.split("out.txt")[0])
-if not os.path.exists(error_file.split("err.txt")[0]):
-  os.makedirs(error_file.split("err.txt")[0])
+Path(kshell_log_path).mkdir(parents=True, exist_ok=True)
+Path(kshell_error_path).mkdir(parents=True, exist_ok=True)
+Path(imsrg_log_path).mkdir(parents=True, exist_ok=True)
+Path(imsrg_error_path).mkdir(parents=True, exist_ok=True)
 
 
 def getNucl(Nucl, A):
@@ -39,7 +42,7 @@ def getNucl(Nucl, A):
 
 
 LECs = ['Ct1S0pp','Ct1S0np','Ct1S0nn','Ct3S1','C1S0','C3P0','C1P1','C3P1','C3S1','CE1','C3P2','c1','c2','c3','c4','cD','cE']
-df = pd.read_csv(f"/work/submit/{username}/imsrg_toolkit/data/8000Samples.txt")
+df = pd.read_csv(f"{ROOT_DIR}/data/8000Samples.txt")
 
 index = np.array(df.index)
 rng = np.random.default_rng(seed=42)
@@ -77,14 +80,7 @@ for A in mass:
     --bind /scratch/submit \\
     --bind /ceph/submit \\
     /work/submit/abelley/work/kshell/kshell.sif """
-    kshell_params['header'] = f"""#!/bin/bash
-#SBATCH --job-name=test
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=10
-#SBATCH --output={log_file}%j.txt
-#SBATCH --error={error_file}%j.txt
-#SBATCH --time=10:00 """
+    
 
     for i in index:
       sample = df.iloc[i]
@@ -96,19 +92,27 @@ for A in mass:
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
-#SBATCH --output=/work/submit/{username}/_results/imsrg_log/outputs/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}_%j.txt
-#SBATCH --error=/work/submit/{username}/_results/imsrg_log/errors/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}_%j.txt
+#SBATCH --output={imsrg_log_path}/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}_%j.txt
+#SBATCH --error={imsrg_error_path}/_results/imsrg_log/errors/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}_%j.txt
 #SBATCH --time={t}
 #SBATCH --mem={m}
 
 cd $SLURM_SUBMIT_DIR
 export OMP_NUM_THREADS=24
 """
+      kshell_params['header'] = f"""#!/bin/bash
+#SBATCH --job-name=kshell_{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}_%j
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=10
+#SBATCH --output={kshell_log_path}/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}%j.txt
+#SBATCH --error={kshell_error_path}/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}%j.txt
+#SBATCH --time=10:00 """
 
 
 
-      header_expvals = f"""#SBATCH --output=/work/submit/{username}/_results/kshell_log/outputs/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}_eval_%j.txt
-#SBATCH --error=/work/submit/{username}/_results/kshell_log/errors/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}_eval_%j.txt"""
+      header_expvals = f"""#SBATCH --output={kshell_log_path}/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}_eval_%j.txt
+#SBATCH --error={kshell_error_path}/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}_eval_%j.txt"""
 
       imsrg_submit = Utils(Nucl, [state, state], imsrg_params, kshell_params, SampleID=SampleID)
       imsrg_submit.submit_all_combine_delta(weights, SampleID, f"{imsrg_submit.output_dir}/{imsrg_submit.filebase}_R2p.csv", header_expvals = header_expvals, verbose=True)
