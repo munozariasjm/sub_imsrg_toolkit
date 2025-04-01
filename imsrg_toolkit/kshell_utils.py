@@ -10,6 +10,7 @@ from imsrg_toolkit.Operator import Operator
 from imsrg_toolkit.settings import username
 import itertools
 import pandas as pd
+from imsrg_toolkit.settings import ROOT_DIR
 
 
 
@@ -430,6 +431,7 @@ class KshellToolkit():
     self.submit_cmd = submit_cmd
     self.state_list = state_list
     self.params = kwargs
+    self.module_path = ROOT_DIR
     self.kshell_ket = KshellWavefunctionScript(fn_snt, Nucl = Nucl, states=state_list[-1], **kwargs)
     if Nucl_daughter != None:
       self.Nucl_daughter = Nucl_daughter
@@ -552,6 +554,8 @@ class KshellToolkit():
     eval_script = "#!/usr/bin/env python3\n"
     if header != None:
       eval_script += f"{header}\n"
+    eval_script += "import sys\n"
+    eval_script += f"sys.path.append('{self.module_path}')\n"
     eval_script += "from imsrg_toolkit.kshell_utils import KshellToolkit\n"
     eval_script += "params = {\n"
     for key, value in self.params.items():

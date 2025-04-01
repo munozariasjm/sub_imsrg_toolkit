@@ -16,9 +16,9 @@ pd.set_option('display.width', 1000)
 
 
 A = 23
-Z = 8
+Z = 13
 N = A-Z
-Nucl = f"O{A}"
+Nucl = f"Al{A}"
 directory = f"/home/submit/abelley/results/{Nucl}/SampleDelta/"
 output_file = f"/work/submit/abelley/results/{Nucl}_radii.csv"
 
