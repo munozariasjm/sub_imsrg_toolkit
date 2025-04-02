@@ -10,6 +10,8 @@ from imsrg_toolkit.Operator import Operator
 from imsrg_toolkit.settings import username
 import itertools
 import pandas as pd
+from imsrg_toolkit.settings import ROOT_DIR
+from shutil import copy
 
 
 
@@ -430,6 +432,7 @@ class KshellToolkit():
     self.submit_cmd = submit_cmd
     self.state_list = state_list
     self.params = kwargs
+    self.module_path = ROOT_DIR
     self.kshell_ket = KshellWavefunctionScript(fn_snt, Nucl = Nucl, states=state_list[-1], **kwargs)
     if Nucl_daughter != None:
       self.Nucl_daughter = Nucl_daughter
@@ -441,6 +444,7 @@ class KshellToolkit():
       self.kshell_bra = self.kshell_ket
       self.density_script = KshellDensityScript(fn_snt, Nucl = Nucl, state_list=state_list, **kwargs)
     self.outputs = []
+    
 
 
   def gen_partition(self, ket=True):
@@ -552,6 +556,8 @@ class KshellToolkit():
     eval_script = "#!/usr/bin/env python3\n"
     if header != None:
       eval_script += f"{header}\n"
+    eval_script += "import sys\n"
+    eval_script += f"sys.path.append('{self.module_path}')\n"
     eval_script += "from imsrg_toolkit.kshell_utils import KshellToolkit\n"
     eval_script += "params = {\n"
     for key, value in self.params.items():
@@ -581,6 +587,12 @@ class KshellToolkit():
 
 
   def submit_all(self, fn_output, fn_ops = [], ops_rankJ=None, ops_rankP=None, ops_rankZ=None, gen_partition=False,  previous_jobid = -1, verbose = False, header=None):
+    if not os.path.exists(f'{self.kshell_ket.scratch_directory}/kshell.exe'):
+      copy(f'{self.module_path}/bin/kshell.exe', self.kshell_ket.scratch_directory)
+    if not os.path.exists(f'{self.kshell_ket.scratch_directory}/transit.exe'):
+      copy(f'{self.module_path}/bin/transit.exe', self.kshell_ket.scratch_directory)
+    if not os.path.exists(f'{self.kshell_ket.scratch_directory}/collect_logs.py'):
+      copy(f'{self.module_path}/bin/collect_logs.py', self.kshell_ket.scratch_directory)
     os.chdir(self.kshell_ket.scratch_directory)
     #Submit the diagonalization
     diag_ids = self.submit_diag(previous_jobid=previous_jobid, verbose = verbose, gen_partition = gen_partition)

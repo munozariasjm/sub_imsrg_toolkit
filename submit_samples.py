@@ -6,7 +6,7 @@ from imsrg_toolkit.settings import username, ROOT_DIR
 import numpy as np
 import pandas as pd
 import os
-from pathlib import PATH
+from pathlib import Path
 
 #for O14
 #emax=4 can request 2min with 256M and it is more than enough
@@ -16,19 +16,19 @@ from pathlib import PATH
 
 
 ##########PARAMETERS TO CHANGE BEFORE RUN###################
-emax = [4,]
-time = ["00:10:00"]
-memory = ['1G',]
+emax = [4,6]
+time = ["00:10:00", "00:30:00"]
+memory = ['1G','3G']
 imsrg_log_path = f"/work/submit/{username}/results/imsrg_log/outputs/"
 imsrg_error_path = f"/work/submit/{username}/results/imsrg_log/errors/"
 kshell_log_path = f"/work/submit/{username}/results/kshell_log/outputs/"
 kshell_error_path = f"/work/submit/{username}/results/kshell_log/errors/"
-mass =  [16]
-Nucleus = "O"
+mass =  [23]
+Nucleus = "Al"
 
 vs = 'sd-shell'
 state = "+1"
-num_samples = 1
+num_samples = 400
 ###########################################################
 # If the paths dont exist, create them
 Path(kshell_log_path).mkdir(parents=True, exist_ok=True)
@@ -115,4 +115,4 @@ export OMP_NUM_THREADS=24
 #SBATCH --error={kshell_error_path}/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}_eval_%j.txt"""
 
       imsrg_submit = Utils(Nucl, [state, state], imsrg_params, kshell_params, SampleID=SampleID)
-      imsrg_submit.submit_all_combine_delta(weights, SampleID, f"{imsrg_submit.output_dir}/{imsrg_submit.filebase}_R2p.csv", header_expvals = header_expvals, verbose=True)
+      imsrg_submit.submit_all_combine_delta(weights, SampleID, f"{imsrg_submit.output_dir}/{imsrg_submit.filebase}_R2p.csv", header_expvals = header_expvals)
