@@ -227,7 +227,7 @@ class Utils():
       if self.HF:
         tmp = [f"{self.output_dir}{self.filebase}_{op[1]}_HF.snt" for op in self.opfiles]
       else:
-        fn_ops = [f"{self.output_dir}{self.filebase}_{op[1]}.snt" for op in self.opfiles]
+        tmp = [f"{self.output_dir}{self.filebase}_{op[1]}.snt" for op in self.opfiles]
       fn_ops.extend(tmp)
     return fn_ops
 

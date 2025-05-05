@@ -14,23 +14,23 @@ import pandas as pd
 opfiles_path = "/work/submit/abelley/operators"
 
 ##########PARAMETERS TO CHANGE BEFORE RUN###################
-# emax = [4,6,8,10]
-# time = ["00:10:00", "00:30:00", "02:00:00","08:00:00"]
-# memory = ['10G', "10G", "20G", "100G"]
-# mass =  [22,23,24,25,27]
-# Nucleus = "Al"
-# vs = 'sd-shell'
-emax = [2]
-time = ["01:00"]
-memory = ['1G']
-mass =  [6]
-Nucleus = "He"
-vs = 'p-shell'
-state = "+1"
+emax = [4,6,8,10]
+time = ["00:10:00", "00:30:00", "02:00:00","08:00:00"]
+memory = ['10G', "10G", "20G","100G"]
+mass =  [24]
+Nucleus = "Al"
+vs = 'sd-shell'
+# emax = [2]
+# time = ["01:00"]
+# memory = ['1G']
+# mass =  [6]
+# Nucleus = "He"
+# vs = 'p-shell'
+state = "1+1"
 file2b = "TwBME-HO_NN-only_N3LO_EM500_srg1.80_hw16_emax18_e2max36.me2j.gz"
 file3b = "NO2B_half_ThBME_EM1.8_2.0_3NFJmax15_IS_hw16_ms16_32_28.stream.bin"
-opnames = ['Rp2']
-# opfiles = [['/work/submit/abelley/operators/M1_2BC_bare_hw16_emax12_e2max24.me2j.gz',"M1_2BC"]]
+opnames = ['M1']
+opfiles = [['/work/submit/abelley/operators/M1_2BC_bare_hw16_emax12_e2max24.me2j.gz',"M1_2BC"]]
 ###########################################################
 
 
@@ -50,24 +50,24 @@ for A in mass:
     imsrg_params['hw'] = 16
     imsrg_params['A'] = A
     imsrg_params['opnames'] = opnames
-    # imsrg_params['opfiles'] = opfiles
+    imsrg_params['opfiles'] = opfiles
     imsrg_params['ref'] = Nucl
     imsrg_params['valence_space'] = vs # this is just a label when custom_valence_space is set
     imsrg_params['label'] = 'magic'
-#     imsrg_params['run_cmd'] = """\
-# srun apptainer exec \\
-#   --bind /home/submit \\
-#   --bind /work/submit \\
-#   --bind /scratch/submit \\
-#   --bind /ceph/submit \\
-#   /work/submit/abelley/pyimsrg.sif """
     imsrg_params['run_cmd'] = """\
 srun apptainer exec \\
   --bind /home/submit \\
   --bind /work/submit \\
   --bind /scratch/submit \\
   --bind /ceph/submit \\
-  /work/submit/abelley/imsrg/pyimsrg.sif """
+  /work/submit/abelley/pyimsrg.sif """
+#     imsrg_params['run_cmd'] = """\
+# srun apptainer exec \\
+#   --bind /home/submit \\
+#   --bind /work/submit \\
+#   --bind /scratch/submit \\
+#   --bind /ceph/submit \\
+#   /work/submit/abelley/imsrg/pyimsrg.sif """
 
     kshell_params = {}
     kshell_params['run_cmd'] = """\
@@ -106,7 +106,7 @@ export OMP_NUM_THREADS=24
     header_expvals = f"""#SBATCH --output=/work/submit/abelley/results/kshell_log/outputs/{imsrg_params['ref']}_emax{imsrg_params['emax']}_magic_eval_%j.txt
 #SBATCH --error=/work/submit/abelley/results/kshell_log/errors/{imsrg_params['ref']}_emax{imsrg_params['emax']}_magic_eval_%j.txt"""
 
-    imsrg_submit = Utils(Nucl, [state, state], imsrg_params, kshell_params, HF=True)
-    imsrg_submit.submit_all(file2b, file3b, f"{imsrg_submit.output_dir}/{imsrg_submit.filebase}_M1.csv", header_expvals = header_expvals, verbose=True)
+    imsrg_submit = Utils(Nucl, [state, state], imsrg_params, kshell_params)
+    imsrg_submit.submit_all(file2b, file3b, f"{imsrg_submit.output_dir}/{imsrg_submit.filebase}_M1.csv", header_expvals = header_expvals, verbose=True, ops_rankJ=[1,1])
     
   # count +=1 

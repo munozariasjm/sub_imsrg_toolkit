@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # ./collect_logs.py log_foo.txt log_bar.txt ...
 #
 

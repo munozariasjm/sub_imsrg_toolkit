@@ -16,19 +16,22 @@ from pathlib import Path
 
 
 ##########PARAMETERS TO CHANGE BEFORE RUN###################
-emax = [4,6]
-time = ["00:10:00", "00:30:00"]
-memory = ['1G','3G']
+# emax = [8]
+# time = ["3:00:00"]
+# memory = ["20G"]
+emax = [10]
+time = ["12:00:00"]
+memory = ["100G"]
 imsrg_log_path = f"/work/submit/{username}/results/imsrg_log/outputs/"
 imsrg_error_path = f"/work/submit/{username}/results/imsrg_log/errors/"
 kshell_log_path = f"/work/submit/{username}/results/kshell_log/outputs/"
 kshell_error_path = f"/work/submit/{username}/results/kshell_log/errors/"
-mass =  [23]
+mass =  [27]
 Nucleus = "Al"
 
 vs = 'sd-shell'
-state = "+1"
-num_samples = 400
+state = "2.5+1"
+num_samples = 100
 ###########################################################
 # If the paths dont exist, create them
 Path(kshell_log_path).mkdir(parents=True, exist_ok=True)
@@ -107,7 +110,8 @@ export OMP_NUM_THREADS=24
 #SBATCH --cpus-per-task=10
 #SBATCH --output={kshell_log_path}/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}%j.txt
 #SBATCH --error={kshell_error_path}/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}%j.txt
-#SBATCH --time=10:00 """
+#SBATCH --time=00:30:00 
+"""
 
 
 

@@ -466,14 +466,20 @@ class KshellToolkit():
     if gen_partition:
       self.gen_partition()
     ket_sh = self.kshell_ket.gen_script()
-    jobid_ket = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', '--kill-on-invalid-dep=yes', ket_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
+    if previous_jobid != -1:
+      jobid_ket = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', '--kill-on-invalid-dep=yes', ket_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
+    else:
+      jobid_ket = run([self.submit_cmd, '--parsable', ket_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
     if verbose:
       print(f'Submitted ket diagonalization with jobid {jobid_ket}')
     if self.Nucl != self.Nucl_daughter:
       if gen_partition:
         self.gen_partition(ket=False)
       bra_sh = self.kshell_bra.gen_script()
-      jobid_bra = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', '--kill-on-invalid-dep=yes', bra_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
+      if previous_jobid != -1:
+        jobid_bra = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', '--kill-on-invalid-dep=yes', bra_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
+      else:
+        jobid_bra = run([self.submit_cmd, '--parsable', bra_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
       if verbose:
         print(f'Submitted bra diagonalization with jobid {jobid_bra}')
       return [jobid_bra, jobid_ket]
@@ -488,9 +494,9 @@ class KshellToolkit():
       fn_sh = self.density_script.gen_script(self.kshell_ket.fn_ptn, self.kshell_bra.fn_ptn)
     if previous_jobids != -1:
       previous_jobids = ':'.join(map(str, previous_jobids))
-    jobid_density = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobids}','--kill-on-invalid-dep=yes', fn_sh], stdout=PIPE, text=True).stdout.rstrip()
-    # else:
-    #   jobid_density = run([self.submit_cmd, '--parsable', fn_sh], stdout=PIPE, text=True).stdout
+      jobid_density = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobids}','--kill-on-invalid-dep=yes', fn_sh], stdout=PIPE, text=True).stdout.rstrip()
+    else:
+      jobid_density = run([self.submit_cmd, '--parsable', fn_sh], stdout=PIPE, text=True).stdout.rstrip() 
     if verbose:
       print(f'Submitted density with jobid {jobid_density}')
     return jobid_density
@@ -580,7 +586,11 @@ class KshellToolkit():
 
   def submit_expvals(self, fn_output, fn_ops, ops_rankJ=None, ops_rankP=None, ops_rankZ=None,  previous_jobid = -1, verbose = False, header=None):
     fn_sh = self.gen_expvals_script(fn_output, fn_ops,  ops_rankJ=ops_rankJ, ops_rankP=ops_rankP, ops_rankZ=ops_rankZ, header = header)
-    jobid = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', '--kill-on-invalid-dep=yes', fn_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
+    if previous_jobid != -1:
+      jobid = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', '--kill-on-invalid-dep=yes', fn_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
+    else:
+      jobid = run([self.submit_cmd, '--parsable', fn_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
+
     if verbose:
       print(f'Submitted expvals with jobid {jobid}')
     return jobid

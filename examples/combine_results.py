@@ -15,7 +15,7 @@ pd.set_option('display.width', 1000)
 
 
 
-A = 24
+A = 27
 Z = 13
 N = A-Z
 Nucl = f"Al{A}"
@@ -182,24 +182,42 @@ for name in glob.glob(f"{directory}*.csv"):
     if SampleId in old_LECs_duplicate:
       continue
     LEC_cols = LECs.loc[SampleId].to_dict()
-    dict_cols = pd.read_csv(name, dtype={
-      'Nucl bra': str,
-      'J bra' : str,  
-      'P bra': str,
-      'n bra': str,
-      'Energy bra': float, 
-      'Nucl ket': str,
-      'J ket' : str,  
-      'P ket': str,
-      'n ket': str,
-      'Energy ket': float,
-      'Zero': float,
-      'One': float,
-      'Two': float
-    }, usecols=[i for i in range(15)][2:] )
+    try:
+      dict_cols = pd.read_csv(name, dtype={
+        'Nucl bra': str,
+        'J bra' : str,  
+        'P bra': str,
+        'n bra': str,
+        'Energy bra': float, 
+        'Nucl ket': str,
+        'J ket' : str,  
+        'P ket': str,
+        'n ket': str,
+        'Energy ket': float,
+        'Zero': float,
+        'One': float,
+        'Two': float
+      }, usecols=[i for i in range(16)][2:] )
+    except:
+      dict_cols = pd.read_csv(name, dtype={
+        'Nucl bra': str,
+        'J bra' : str,  
+        'P bra': str,
+        'n bra': str,
+        'Energy bra': float, 
+        'Nucl ket': str,
+        'J ket' : str,  
+        'P ket': str,
+        'n ket': str,
+        'Energy ket': float,
+        'Zero': float,
+        'One': float,
+        'Two': float
+      }, usecols=[i for i in range(15)][2:] )
     dict_cols = dict_cols.rename(columns=lambda x: x.strip())
     dict_cols = dict_cols.iloc[0].to_dict()
     dict_cols.update(LEC_cols)
+    
     Rp2 = dict_cols['Zero'] + dict_cols['One'] + dict_cols['Two']
 
     dict_cols['Rch'] = np.sqrt(Rp2_to_Rch2(Rp2,Z,N))
