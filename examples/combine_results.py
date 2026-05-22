@@ -15,12 +15,12 @@ pd.set_option('display.width', 1000)
 
 
 
-A = 27
+A = 26
 Z = 13
 N = A-Z
 Nucl = f"Al{A}"
 directory = f"/home/submit/abelley/results/{Nucl}/SampleDelta/"
-output_file = f"/work/submit/abelley/results/{Nucl}_radii.csv"
+output_file = f"/work/submit/abelley/results/{Nucl}_Rn.csv"
 
 
 
@@ -57,7 +57,7 @@ col_names = ['Nucl bra',
             'Zero',
             'One',
             'Two',
-            'Rch'
+            'Rn'
             ]
 
 col_labels = LEC_labels + col_names 
@@ -168,7 +168,7 @@ results = IMSRGResultsDF(file=output_file)
 
 count = 0
 
-for name in glob.glob(f"{directory}*.csv"):
+for name in glob.glob(f"{directory}*ops.csv"):
   # if count>=1: break
   # try:
     fn = name.replace(directory,'')
@@ -217,10 +217,13 @@ for name in glob.glob(f"{directory}*.csv"):
     dict_cols = dict_cols.rename(columns=lambda x: x.strip())
     dict_cols = dict_cols.iloc[0].to_dict()
     dict_cols.update(LEC_cols)
+    # print(dict_cols)
     
-    Rp2 = dict_cols['Zero'] + dict_cols['One'] + dict_cols['Two']
+    # Rp2 = dict_cols['Zero'] + dict_cols['One'] + dict_cols['Two']
 
-    dict_cols['Rch'] = np.sqrt(Rp2_to_Rch2(Rp2,Z,N))
+    # dict_cols['Rch'] = np.sqrt(Rp2_to_Rch2(Rp2,Z,N))
+    Rn2 = dict_cols['Zero'] + dict_cols['One'] + dict_cols['Two']
+    dict_cols['Rn'] = np.sqrt(Rn2)
     results.add_to_dataframe(Nucl, SampleId, emax, dict_cols)
   # except:
   #   failed_samples.append(SampleId)

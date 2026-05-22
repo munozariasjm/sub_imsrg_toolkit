@@ -50,6 +50,8 @@ class ImsrgParams():
   #Operators parameters
   opfiles: list[str] = field(default_factory=list)
   opnames: list[str] = field(default_factory=list)
+  ops: list = field(default_factory=list)
+  op_strings: list[str] = field(default_factory=list) #Name at the end of the snt file
   write_HO_ops: bool = True
   write_HF_ops: bool = True
   #Strings for submission
@@ -62,6 +64,8 @@ class ImsrgParams():
       self.filebase = f"{self.valence_space}_{self.label}_{self.ref}_{self.method}_e{self.emax}_E{self.E3max}_hw{self.hw}"
     else:
       self.filebase = f"{self.valence_space}_{self.label}_{self.SampleID}_{self.ref}_{self.method}_e{self.emax}_E{self.E3max}_hw{self.hw}"
+    if self.BetaCM!=0:
+      self.filebase += f"_BetaCM{self.BetaCM}"
 
 
   def __post_init__(self):

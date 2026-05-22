@@ -235,8 +235,6 @@ class Imsrg(ImsrgParams):
 
 
   def evolve_operators(self, HF=False):
-    self.ops = []
-    self.op_strings = [] #Name at the end of the snt file
     if len(self.opnames) != 0:
       for opname in self.opnames:
         print(f"Starting to evolve {opname}:")
@@ -273,7 +271,7 @@ class Imsrg(ImsrgParams):
       self.write_op_to_file(op, name)
 
 
-  def evolve_Hamiltonian(self, HNO):
+  def evolve_Hamiltonian(self, HNO, renormal_order=True):
     #Initialize the IMSRGSolver instance and set parameters
     self.imsrgsolver = IMSRGSolver(HNO)
     self.imsrgsolver.SetHin(HNO)
@@ -292,9 +290,11 @@ class Imsrg(ImsrgParams):
 
     #### Get evolved Hamiltonian NO wrt the core
     HNO = self.imsrgsolver.GetH_s()
-    HNO = HNO.UndoNormalOrdering()
-    HNO = HNO.DoNormalOrderingCore()
+    if renormal_order:
+      HNO = HNO.UndoNormalOrdering()
+      HNO = HNO.DoNormalOrderingCore()
     return HNO
+
 
   def run(self, file2b, file3b, HF=False):
     #Initiate the ReadWrite class to access files
@@ -386,57 +386,173 @@ class Imsrg(ImsrgParams):
     self.evolve_operators(HF=HF)
 
 
+  
+class PvImsrg(Imsrg):
+  def __init__(staged=False, **kwargs):
+    super().__init__(**kwargs)
 
-# class PvImsrg(Imsrg):
-#   def __init__(staged=False, **kwargs):
-#     super.__init__(**kwargs)
-#     staged = staged
 
-#   def run_anapole_moment(self, file2b, file3b HF=False, scale=1000):
-#     #Initiate the ReadWrite class to access files
-#     self.rw = ReadWrite()
+  def op_HF_NO(self, op):
+    # Transform operators to HF basis
+    if op.GetJRank() == 0 and (op.GetTRank() != 0 or op.GetParity() != 0):
+      op.MakeNotReduced()
+    op = self.hf.TransformToHFBasis(op)
+    # Write HF operator to file.
+    op = op.DoNormalOrdering()
+    if op.GetJRank() == 0 and (op.GetTRank() !=0 or op.GetParity()!=0):
+      op.MakeReduced()
+    return op
+  
 
-#     #Create the model space for the nuclei
-#     self.init_modelspace()
+  def add_operator(self, op, opname):
+    self.ops.append(op)
+    self.op_strings.append(opname)
 
-#     #Create the input hamiltonian from the 2b and 3b file
-#     Hbare = self.read_interaction(file2b, file3b, HF = HF)
-#     if self.BetaCM!=0:
-#       Hbare += self.BetaCM*OperatorFromString(self.ms, f'HCM_{self.hwBetaCM}')
 
-#     #Solve HFMBPT to obtain reference state
-#     self.hf = HFMBPT( Hbare )
-#     self.hf.Solve()
-#     HNO = self.hf.GetNormalOrderedH(2)
-#     if self.BetaCM != 0:
-#       HNO -= self.BetaCM * 1.5*self.hwBetaCM
+  def __write_op_to_file__(self, fn_base, op, opname=None, path=None, extra=None):
+    if path:
+      fn = f'{path}/{fn_base}'
+    else:
+      fn = f'{fn_base}'
+    if opname:
+      fn += f"_{opname}"
+    if extra:
+      fn += f"_{extra}"
+    fn += ".snt"
+    op_copy = Operator(op)
+    if op_copy.GetJRank() == 0 and (op_copy.GetTRank() != 0 or op_copy.GetParity() != 0):
+      op_copy.MakeNotReduced()
+    op_copy = op_copy.UndoNormalOrdering()
+    if op_copy.GetJRank() == 0 and (op_copy.GetTRank() != 0 or op_copy.GetParity() != 0):
+      op_copy.MakeReduced()
+    if op_copy.GetJRank() == 0 and (op_copy.GetTRank() != 0 or op_copy.GetParity() != 0):
+      op_copy.MakeNotReduced()
+    op_copy = op_copy.DoNormalOrderingCore()
+    if op_copy.GetJRank() == 0 and (op_copy.GetTRank() != 0 or op_copy.GetParity() != 0):
+      op_copy.MakeReduced()
+    if op_copy.GetJRank() == 0 and op_copy.GetTRank() == 0 and op_copy.GetParity() == 0:
+      self.rw.WriteTokyo(op_copy, fn, "")
+    else:
+      self.rw.WriteTensorTokyo(fn, op_copy)
+    return fn
+
+
+  def write_to_file(self, HNO, fn_base = None, VPV=None, path=None, extra=None):
+    files = []
+    if not fn_base:
+      vs = self.vs
+      fn_base = f"{vs}_{self.ref}_hw{self.hw}_emax{self.emax}_E{self.E3max}_s{self.solver_params['smax']}_ds{self.solver_params['dsmax']}"
+      if self.BetaCM != 0:
+        fn_base += f'_BCM{self.BetaCM}'
+    print(fn_base)
+    files.append(self.__write_op_to_file__(fn_base, HNO, path=path, extra=extra))
+    if VPV:
+      files.append(self.__write_op_to_file__(fn_base, VPV, opname = "VPV", path=path, extra=extra))
+    for op, opname in zip(self.ops, self.op_strings):
+      files.append(self.__write_op_to_file__(
+          fn_base, op, opname=opname, path=path, extra=extra))
+    return files
+
+
+  def get_HNO(self,  H0):
+    self.hf = HartreeFock(H0)
+    self.hf.Solve()
+    self.hf.PrintSPEandWF()
+    HNO = self.hf.GetNormalOrderedH(2)
+    return HNO
+  
+
+  def operators_to_HF(self):
+    self.ops = [self.op_HF_NO(op) for op in self.ops]
+
+
+  def evolve_operators_PV(self):
+    self.ops = [self.imsrgsolver.Transform(
+        op, op_PV) for op, op_PV in zip(*[iter(self.ops)]*2)]
+    self.ops = [item for t in self.ops for item in t]
+
+
+  def evolve_operators(self):
+    self.ops = [self.imsrgsolver.Transform(op)for op in self.ops]
+
+
+  def evolve_Hamiltonian_PV(self, HNO, VPV, core_generator = None, valence_space_generator=None):
+    if not core_generator:
+      core_generator = self.core_generator
+    if not valence_space_generator:
+      valence_space_generator = self.valence_space_generator
+    print(core_generator)
+    print(valence_space_generator)
+    stdout.flush()
+    # Initialize the IMSRGSolver instance and set parameters
+    self.imsrgsolver = IMSRGSolverPV(HNO, VPV)
+    self.imsrgsolver.SetReadWrite(self.rw)
+    #Set parameters for the IMSRG solver
+    self.set_imsrgsolver()
+
+    #Decouple the core
+    self.imsrgsolver.SetGeneratorPV(core_generator)
+    self.imsrgsolver.Solve_magnus_euler()
+
+    #Update IMSRG params for the decoupling of the valence-space
+    self.imsrgsolver.SetSmax( 2*self.smax)
+    self.imsrgsolver.SetGeneratorPV(valence_space_generator)
+    self.imsrgsolver.Solve_magnus_euler()
+
+    #### Get evolved Hamiltonian
+    HNO = self.imsrgsolver.GetH_s()
+    VPV = self.imsrgsolver.GetVPT_s()
+
+    return HNO, VPV
+
+
+  def run_anapole(self, file2b, file3b, scale=1000, staged=True):
+    #Initiate the ReadWrite class to access files
+    self.rw = ReadWrite()
+
+    #Create the model space for the nuclei
+    self.init_modelspace()
+
+    #Create the input hamiltonian from the 2b and 3b file
+    Hbare = self.read_interaction(file2b, file3b)
+    if self.BetaCM!=0:
+      Hbare += self.BetaCM*OperatorFromString(self.ms, f'HCM_{self.hwBetaCM}')
+
+    #Create anapole operators
+    Anapole = OperatorFromString(self.ms, 'Anapole')
+    Anapolepp = Operator(self.ms, 1, 0, 0, 2)
+    self.add_operator(Anapolepp, "Anapolepp")
+    self.add_operator(Anapole, "Anapole")
+
+    #Read the VPV interaction
+    VPNC_path = f"{INTERACTION_2B_PATH}/PVTCint_DDH_best-LO-NonLocal2-500_TwBME-HO_NN-only_N3LO_EM500_bare_hw{self.hw}_emax12_e2max24.me2j.gz"
+    VPNC = self.rw.ReadOperator2b_Miyagi(VPNC_path, self.ms)
+    VPNC.SetAntiHermitian()
+    VPNC *= scale
+
+    #Solve HFMBPT to obtain reference state
+    HNO = self.get_HNO(Hbare)
+    if self.BetaCM != 0:
+      HNO -= self.BetaCM * 1.5*self.hwBetaCM
+    #Give estimate with perturbation theory to make sure everything is ok
+    self.print_estimatePT(HNO)
     
-#     VPNC_path = f"{INTERACTION_2B_PATH}/PVTCint_DDH_best-LO-NonLocal2-500_TwBME-HO_NN-only_N3LO_EM500_bare_hw15_emax12_e2max24.me2j.gz"
-#     VPNC = self.rw.ReadOperator2b_Miyagi(VPNC_path, self.ms)
-#     VPNC.SetAntiHermitian()
-#     VPNC *= scale
-
-
-
-#     #If we only want the HF results, stop the calculation of the interaction here
-#     if HF:
-#       HNO = HNO.DoNormalOrderingCore()
-#       print(f'Writing output file to {self.output_dir}')
-#       self.rw.WriteTokyo(HNO,self.intfile+"_HF.snt", "")
-#       stdout.flush()
-#     else:
-#       #Give estimate with perturbation theory to make sure everything is ok
-#       self.print_estimatePT(HNO)
-
-#       #Do the IMSRG evolution of the Hamiltonian
-#       HNO = self.evolve_Hamiltonian(HNO)
-
-#       # Write things to disk
+    VPNC = self.op_HF_NO(VPNC)
+    self.operators_to_HF()
     
-#       print(f'Writing output file to {self.output_dir}')
-#       self.intfile = f"{self.output_dir}/{self.filebase}"
-#       self.rw.WriteTokyo(HNO,self.intfile+".snt", "")
-#       stdout.flush()
-
-#     # Evolve operators
-#     self.evolve_operators(HF=HF)
+    if staged:
+      #We first do the decoupling using the standard IMSRG
+      HNO = self.evolve_Hamiltonian(HNO, renormal_order=False)
+      VPNC = self.imsrgsolver.Transform(VPNC)
+      self.evolve_operators()
+    
+    HNO, VPNC = self.evolve_Hamiltonian_PV(HNO, VPNC, core_generator='white', valence_space_generator='shell-model')
+    self.evolve_operators_PV()
+    
+    self.output_dir = f"{self.output_directory_base}/{self.ref}/{self.label}/"
+    Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+    print(f'Writing output file to {self.output_dir}')
+    stdout.flush()
+    fn_snt, fn_VPNC, fn_Anapolepp, fn_Anapole = self.write_to_file(
+      HNO, VPV=VPNC, path=os.path.abspath(self.output_dir), fn_base=self.filebase)
+    return fn_snt, fn_Anapolepp

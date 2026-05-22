@@ -127,10 +127,50 @@ class Utils():
     return script
 
 
+  def write_script_header_anapole(self):
+    script = "#!/usr/bin/env python3\n"
+    script += "import sys\n"
+    script += f"sys.path.append('{self.module_path}')\n"
+    script += "from imsrg_toolkit.imsrg import PvImsrg\n"
+    script += "from imsrg_toolkit.kshell_utils import KshellToolkit\n"
+    script += "params = {\n"
+    for key, value in self.imsrg_params.items():
+      if key == 'header' or key == 'run_cmd' : continue
+      if type(value) == str:
+        script += f"\t '{key}': '{value}',\n"
+      else:
+        script += f"\t '{key}': {value},\n"
+    script+='}\n'
+    script += "params_kshell = {\n"
+    for key, value in self.kshell.params.items():
+      if key == 'header' or key == 'run_cmd': continue
+      if type(value) == str:
+        script += f"\t '{key}': '{value}',\n"
+      else:
+        script += f"\t '{key}': {value},\n"
+    script+='}\n'
+
+    script += "imsrg = PvImsrg(**params)\n"
+
+    return script
+
+
   def gen_imsrg_python_script(self, file2b, file3b):
     fn_pyimsrg = self.scratch_directory+self.fn_py
     script = self.write_script_header()
     script += f"imsrg.run('{file2b}', '{file3b}', HF = {self.HF})\n"
+    script = self.add_kshell_partition(script)
+    f = open(fn_pyimsrg, "w")
+    f.write(script)
+    f.close()
+    os.chmod(fn_pyimsrg, 0o755)
+    return fn_pyimsrg
+  
+
+  def gen_imsrg_python_script_anapole(self, file2b, file3b, scale=1000, staged=True):
+    fn_pyimsrg = self.scratch_directory+self.fn_py
+    script = self.write_script_header_anapole()
+    script += f"imsrg.run_anapole('{file2b}', '{file3b}', scale = {scale}, staged = {staged})\n"
     script = self.add_kshell_partition(script)
     f = open(fn_pyimsrg, "w")
     f.write(script)
@@ -191,6 +231,12 @@ class Utils():
     self.write_submission_script(fn_script, python_script)
     return fn_script
 
+  def gen_imsrg_submit_script_anapole(self, file2b, file3b, staged=True, scale=1000):
+    fn_script = self.scratch_directory+self.fn_sh
+    python_script = self.gen_imsrg_python_script_anapole(file2b, file3b, staged=staged, scale=scale)
+    self.write_submission_script(fn_script, python_script)
+    return fn_script
+
 
   def gen_imsrg_submit_script_combine_delta(self):
     fn_script = self.scratch_directory+self.fn_sh
@@ -208,6 +254,11 @@ class Utils():
 
   def submit_imsrg(self, file2b, file3b, verbose=False):
     fn_sh = self.gen_imsrg_submit_script(file2b, file3b)
+    return self.submit_job(fn_sh, verbose=verbose)
+
+
+  def submit_anapole(self, file2b, file3b, verbose=False, staged=True, scale = 1000):
+    fn_sh = self.gen_imsrg_submit_script_anapole(file2b, file3b, scale=scale, staged=staged)
     return self.submit_job(fn_sh, verbose=verbose)
 
 
@@ -240,3 +291,9 @@ class Utils():
     imsrg_id = self.submit_imsrg_combine_delta(verbose=verbose)
     fn_ops = self.gen_oplist()
     self.kshell.submit_all(fn_output, fn_ops, previous_jobid = imsrg_id, ops_rankJ = ops_rankJ, ops_rankP = ops_rankP, ops_rankZ = ops_rankZ, header = header_expvals, verbose=verbose)
+  
+
+  def submit_all_anapole(self, file2b, file3b, fn_output, ops_rankJ=None, ops_rankP=None, ops_rankZ=None,  header_expvals=None, verbose=False, staged=True, scale = 1000):
+    imsrg_id = self.submit_anapole(file2b, file3b, verbose=verbose, staged = staged, scale=scale)
+    fn_ops = fn_ops = [f"{self.output_dir}{self.filebase}_Anapolepp.snt"]
+    self.kshell.submit_anapole(fn_output, fn_ops, previous_jobid = imsrg_id, ops_rankJ = ops_rankJ, ops_rankP = ops_rankP, ops_rankZ = ops_rankZ, header = header_expvals, verbose=verbose, scale=scale)

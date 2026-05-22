@@ -87,7 +87,7 @@ class KshellScript():
     self.Z, self.N, self.A = _ZNA_from_str(self.Nucl)
     self.header = " "
     self.output_directory =  f"/home/submit/{username}/results/kshell/"
-    self.scratch_directory = f"/work/submit/{username}/work/test_3/"
+    self.scratch_directory = f"/work/submit/{username}/work/test3/"
     self.update_params(**kwargs)
     fn_snt_path = Path(fn_snt)
     self.filebase = fn_snt_path.name[:-4]
@@ -296,6 +296,8 @@ class KshellWavefunctionScript(KshellScript):
                 hws = None
                 while ene in e_data: ene += 0.000001
                 line = f.readline()
+                while not line.strip().startswith(("<Hcm>:","<TT>:")):
+                  line = f.readline()
                 dat = line.split()
                 if(dat[0]=="<Hcm>:"): tt = int(dat[5][:-2])
                 if(dat[0]=="<TT>:"): tt = int(dat[3][:-2])
@@ -312,14 +314,11 @@ class KshellWavefunctionScript(KshellScript):
                     for i in range(len(data)-2):
                         nlist.append(float(data[i+2]))
                 if(hw_ex):
-                    while len(line)!=0:
-                        line = f.readline()
-                        data = line.split()
-                        if(line[0:4] ==" hw:"):
-                            hws = {}
-                            for i in range(len(data)-1):
-                                hw, prob = data[i+1].split(":")
-                                hws[int(hw)] = float(prob)
+                    if(line[0:4] ==" hw:"):
+                        hws = {}
+                        for i in range(len(dat)-1):
+                            hw, prob = dat[i+1].split(":")
+                            hws[int(hw)] = float(prob)
                             break
                 if(hws!=None): e_data[ (J,prty,Njpi[(J,prty)]) ] = (ene, log, tt, plist, nlist, hws)
                 if(hws==None): e_data[ (J,prty,Njpi[(J,prty)]) ] = (ene, log, tt, plist, nlist)
@@ -355,7 +354,7 @@ class KshellWavefunctionScript(KshellScript):
       #TODO this actually need to be implemented in gen_partition.py
       tmod = 1
       truncation_params = self.ph_truncation
-    if self.hw_truncation != None and seld.ph_truncation == None:
+    if self.hw_truncation != None and self.ph_truncation == None:
       tmod = 2
       truncation_params = self.hw_truncation
     #TODO add other options for the truncations of the model space
@@ -371,7 +370,7 @@ class KshellWavefunctionScript(KshellScript):
     else:
       J = float(re.findall(r"[-+]?\d*\.*\d+", self.states)[0])
       m = int(2*J)
-      n_eigen = int(self.states[2:])
+      n_eigen = int(re.findall(r"[-+]?\d*\.*\d+", self.states)[1][1:])
     str_state = state_string(self.states, self.A)
     if gen_partition and str_state[-1] == 'p':
       self.gen_partition(1)
@@ -405,7 +404,7 @@ class KshellWavefunctionScript(KshellScript):
     """)
     s+= f"{self.run_cmd} ./kshell.exe {self.fn_base}_{str_state}.input > log_{self.fn_base}_{str_state}.txt 2>&1\n"
     s+= dedent(f"""
-      rm -f tmp_snapshot_*{Path(self.fn_ptn).name}_0_* tmp_lv_*{Path(self.fn_ptn).name}_0_* {self.fn_base}_{str_state}.input
+      rm -f tmp_snapshot_*{Path(self.fn_ptn).name}* tmp_lv_*{Path(self.fn_ptn).name}* {self.fn_base}_{str_state}.input
 
       ./collect_logs.py log_*{self.fn_base}* > summary_{self.fn_base}.txt
       cp summary_{self.fn_base}.txt {self.output_directory}
@@ -474,7 +473,7 @@ class KshellDensityScript(KshellScript):
         fn_ptn_r = "{fn_ptn}"
         fn_load_wave_l = "{self.Nucl_daughter}_{self.filebase}_{state_string(self.state_list[1], self.A_daughter)}.wav"
         fn_load_wave_r = "{self.Nucl}_{self.filebase}_{state_string(self.state_list[0], self.A)}.wav"
-        hw_type = 2
+        hw_type = 1
         eff_charge = 1.5, 0.5
         gl = 1.0, 0.0
         gs = 3.91, -2.678
@@ -582,7 +581,6 @@ class KshellToolkit():
     wf_index_ket = kshell_ket.get_wf_index()
     energies_bra = kshell_bra.summary_to_dictionary()
     energies_ket = kshell_ket.summary_to_dictionary()
-    exp_vals = pd.DataFrame()
     for state_bra, state_ket in itertools.product(list(wf_index_bra.keys()), list(wf_index_ket.keys())):
       Jbra, Pbra, nn_bra = state_bra
       Jket, Pket, nn_ket = state_ket
@@ -603,13 +601,13 @@ class KshellToolkit():
       self.outputs.append(output)
 
 
-  def gen_df_from_outputs(self):
+  def gen_df_from_outputs(self, columns = ["fn_op", "Nucl bra","J bra","P bra","n bra","Energy bra","Nucl ket","J ket","P ket","n ket","Energy ket","Zero","One","Two"]):
     self.df = pd.DataFrame(self.outputs)
-    self.df.columns = ["fn_op", "Nucl bra","J bra","P bra","n bra","Energy bra","Nucl ket","J ket","P ket","n ket","Energy ket","Zero","One","Two"]
+    self.df.columns = columns
 
 
-  def write_outputs_to_file(self, fn_output):
-    self.gen_df_from_outputs()
+  def write_outputs_to_file(self, fn_output, columns = ["fn_op", "Nucl bra","J bra","P bra","n bra","Energy bra","Nucl ket","J ket","P ket","n ket","Energy ket","Zero","One","Two"]):
+    self.gen_df_from_outputs(columns=columns)
     try:
       df = pd.read_csv(fn_output)
       self.df = pd.concat([df,self.df])
@@ -651,6 +649,52 @@ class KshellToolkit():
     f.close()
     os.chmod(fn_eval, 0o755)
     return fn_eval
+  
+  def gen_expvals_script_anapole(self, fn_output, fn_ops, ops_rankJ=None, ops_rankP=None, ops_rankZ=None, header=None, scale=1000):
+    if ops_rankJ == None:
+      ops_rankJ = [0 for _ in  fn_ops]
+    if ops_rankP == None:
+      ops_rankP = [1 for _ in  fn_ops]
+    if ops_rankZ == None:
+      ops_rankZ = [0 for _ in  fn_ops]
+    J = float(re.findall(r"[-+]?\d*\.*\d+", self.state_list[0])[0])
+    fn_eval = self.kshell_bra.scratch_directory+self.kshell_bra.filebase+"_eval.py"
+    eval_script = "#!/usr/bin/env python3\n"
+    if header != None:
+      eval_script += f"{header}\n"
+    eval_script += "import sys\n"
+    eval_script += f"sys.path.append('{self.module_path}')\n"
+    eval_script += "from imsrg_toolkit.kshell_utils import KshellToolkit\n"
+    eval_script += "import numpy as np\n"
+    eval_script += "hbarc = 197.327053  # MeV fm\n"
+    eval_script += "GF = 1.1663787e-5  # GeV^-2\n"
+    eval_script += "GF *= 1e-6  # Convert to MeV^-2\n"
+    eval_script += "GF *= hbarc**3  # Convert to MeV fm^3\n"
+    eval_script += "alpha = 1/137.035999084  # Fine structure constant\n"
+    eval_script += "m_p = 938.2720813  # MeV/c^2\n"
+    eval_script += "params = {\n"
+    for key, value in self.params.items():
+      if key == 'header' or key == 'run_cmd' : continue
+      if type(value) == str:
+        eval_script += f"\t '{key}': '{value}',\n"
+      else:
+        eval_script += f"\t '{key}': {value},\n"
+    eval_script+='}\n'
+    eval_script += f"vals = KshellToolkit('{self.fn_snt}', '{self.Nucl}', {self.state_list}, **params)\n"
+    for op, op_rankJ, op_rankP, op_rankZ  in zip(fn_ops, ops_rankJ, ops_rankP, ops_rankZ):
+      eval_script += f"vals.calc_opexpvals('{op}', op_rankJ = {op_rankJ}, op_rankP = {op_rankP}, op_rankZ = {op_rankZ})\n"
+    eval_script += 'factor = -np.pi*hbarc*alpha/GF*hbarc/m_p\n'
+    eval_script += r'factor /='+f'{scale}\n'
+    eval_script += f'factor *= {J} / np.sqrt({J} * ({J}+1) * (2*{J}+1))\n'
+    eval_script  += "Ap = float((vals.outputs[0][-3]+vals.outputs[0][-2]+vals.outputs[0][-1]))\n"
+    eval_script += "Ap *= factor\n"
+    eval_script += "vals.outputs[0].append(Ap)\n"
+    eval_script += f"vals.write_outputs_to_file('{fn_output}' ,columns = ['fn_op', 'Nucl bra','J bra','P bra','n bra','Energy bra','Nucl ket','J ket','P ket','n ket','Energy ket','Zero','One','Two','kA'])"
+    f = open(fn_eval, "w")
+    f.write(eval_script)
+    f.close()
+    os.chmod(fn_eval, 0o755)
+    return fn_eval
 
 
   def submit_expvals(self, fn_output, fn_ops, ops_rankJ=None, ops_rankP=None, ops_rankZ=None,  previous_jobid = -1, verbose = False, header=None):
@@ -664,6 +708,17 @@ class KshellToolkit():
       print(f'Submitted expvals with jobid {jobid}')
     return jobid
 
+
+  def submit_expvals_anapole(self, fn_output, fn_ops, ops_rankJ=None, ops_rankP=None, ops_rankZ=None,  previous_jobid = -1, verbose = False, header=None, scale=1000):
+    fn_sh = self.gen_expvals_script_anapole(fn_output, fn_ops,  ops_rankJ=ops_rankJ, ops_rankP=ops_rankP, ops_rankZ=ops_rankZ, header = header, scale=scale)
+    if previous_jobid != -1:
+      jobid = run([self.submit_cmd, '--parsable', f'--dependency=afterok:{previous_jobid}', '--kill-on-invalid-dep=yes', fn_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
+    else:
+      jobid = run([self.submit_cmd, '--parsable', fn_sh], stdout=PIPE, text=True, check=True).stdout.rstrip()
+
+    if verbose:
+      print(f'Submitted expvals with jobid {jobid}')
+    return jobid
 
   def submit_all(self, fn_output, fn_ops = [], ops_rankJ=None, ops_rankP=None, ops_rankZ=None, gen_partition=False,  previous_jobid = -1, verbose = False, header=None):
     if not os.path.exists(f'{self.kshell_ket.scratch_directory}/kshell.exe'):
@@ -680,3 +735,20 @@ class KshellToolkit():
     if len(fn_ops) > 0:
       #Submit the exp vals calculations
       self.submit_expvals(fn_output, fn_ops, ops_rankJ = ops_rankJ, ops_rankP = ops_rankP, ops_rankZ = ops_rankZ, previous_jobid = density_id, verbose=verbose, header=header)
+  
+
+  def submit_anapole(self, fn_output, fn_ops = [], ops_rankJ=None, ops_rankP=None, ops_rankZ=None, gen_partition=False,  previous_jobid = -1, verbose = False, header=None, scale=1000):
+    if not os.path.exists(f'{self.kshell_ket.scratch_directory}/kshell.exe'):
+      copy(f'{self.module_path}/bin/kshell.exe', self.kshell_ket.scratch_directory)
+    if not os.path.exists(f'{self.kshell_ket.scratch_directory}/transit.exe'):
+      copy(f'{self.module_path}/bin/transit.exe', self.kshell_ket.scratch_directory)
+    if not os.path.exists(f'{self.kshell_ket.scratch_directory}/collect_logs.py'):
+      copy(f'{self.module_path}/bin/collect_logs.py', self.kshell_ket.scratch_directory)
+    os.chdir(self.kshell_ket.scratch_directory)
+    #Submit the diagonalization
+    diag_ids = self.submit_diag(previous_jobid=previous_jobid, verbose = verbose, gen_partition = gen_partition)
+    #Submit the density
+    density_id = self.submit_density(previous_jobids = diag_ids,  verbose = verbose)
+    if len(fn_ops) > 0:
+      #Submit the exp vals calculations
+      self.submit_expvals_anapole(fn_output, fn_ops, ops_rankJ = ops_rankJ, ops_rankP = ops_rankP, ops_rankZ = ops_rankZ, previous_jobid = density_id, verbose=verbose, header=header, scale=1000)
