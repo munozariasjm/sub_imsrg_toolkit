@@ -96,7 +96,7 @@ class Utils():
     self.filebase = fn_snt_path.name
     self.fn_py = self.filebase+".py"
     self.fn_sh = self.filebase+".sh"
-    self.scratch_directory = f'/work/submit/{username}/work/imsrg/'
+    self.scratch_directory = pars.scratch_directory
 
 
   def write_script_header(self):

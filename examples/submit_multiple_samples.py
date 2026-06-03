@@ -11,7 +11,7 @@ LECs = ['Ct1S0pp','Ct1S0np','Ct1S0nn','Ct3S1','C1S0','C3P0','C1P1','C3P1','C3S1'
 df = pd.read_csv("/work/submit/abelley/imsrg_toolkit/data/8000Samples.txt")
 
 
-# index = np.array([1728])
+index = np.array([1728])
 # sample1 = [0.356199,-0.355142,-0.349985,-0.248157,2.78763,0.433097,-0.086705,-1.299329,0.788,0.520089,-0.846265,-0.736674,-0.606916,-0.47898,0.930314,-0.588286,-0.068944]
 # sample13 = [-0.349296,-0.34783,-0.345087,-0.251179,2.775803,0.51126,-0.014905,-0.995633,0.932483,0.358223,-0.787001,-0.707744,-0.441933,-0.706367,0.998484,0.493866,0.372671]
 # samples = [sample1, sample13]
@@ -22,25 +22,28 @@ df = pd.read_csv("/work/submit/abelley/imsrg_toolkit/data/8000Samples.txt")
 emax = [10]
 time = ["08:00:00"]
 memory = ['100G']
-samples_numbers = [100]
+samples_numbers = [1]
 # As = [22,23,24,25,26,27]
 # states = ['4+1',"2.5+1", "4+1", "2.5+1", "5+1", "2.5+1"]
-As = [26,27]
-states = ["5+1", "2.5+1"]
+# As = [26,27]
+states = ["1.5+1", "0+1", "3.5-1"]
+As = [33,34,35]
 
 for A, state in zip(As,states):
-  Nucl = f"Al{A}" 
+  Nucl = f"Si{A}" 
   imsrg_params = {}
   imsrg_params['E3max'] = 28
   imsrg_params['hw'] = 10
-  # imsrg_params['BetaCM'] = 0
+  imsrg_params['BetaCM'] = 4
   imsrg_params['A'] = A
-  imsrg_params['opnames'] = ['Rn2']
+  imsrg_params['opnames'] = ['Rp2','Rn2']
   # imsrg_params['opfiles'] = opfiles = [['/work/submit/abelley/operators/M1_2BC_bare_hw10_emax12_e2max24.me2j.gz',"M1_2BC"]]
   imsrg_params['ref'] = Nucl
-  imsrg_params['valence_space'] = '0hw-shell' # this is just a label when custom_valence_space is set
+  # imsrg_params['valence_space'] = '0hw-shell' # this is just a label when custom_valence_space is set
+  imsrg_params['valence_space'] = 'PsdNsdfp-shell' # this is just a label when custom_valence_space is set
+  imsrg_params['custom_valence_space'] = "O16,p0d5,p0d3,p1s1,n0d5,n0d3,n1s1,n0f7,n1p3"
   imsrg_params['label'] = 'SampleDelta'
-  # imsrg_params['denominator_delta'] = 10
+  imsrg_params['denominator_delta'] = 10
   imsrg_params['run_cmd'] = """\
 srun apptainer exec \\
   --bind /home/submit \\
@@ -54,9 +57,9 @@ srun apptainer exec \\
 mpirun -np $SLURM_NTASKS"""
   
   for e, t, mem, num in zip(emax, time, memory, samples_numbers):
-    index = np.array(df.index)
-    rng = np.random.default_rng()
-    index = rng.choice(index, num, replace=False, shuffle=False)
+    # index = np.array(df.index)
+    # rng = np.random.default_rng()
+    # index = rng.choice(index, num, replace=False, shuffle=False)
     imsrg_params['emax'] = e
     
   
@@ -100,10 +103,10 @@ module load mpi """
       imsrg_params['SampleID'] =  SampleID
       imsrg_params['LECs'] =  weights
       header_expvals = f"""#SBATCH --output=/work/submit/abelley/results/kshell_log/outputs/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}_eval_%j.txt
-  #SBATCH --error=/work/submit/abelley/results/kshell_log/errors/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}_eval_%j.txt"""
+#SBATCH --error=/work/submit/abelley/results/kshell_log/errors/{imsrg_params['ref']}_emax{imsrg_params['emax']}_Sample{SampleID}_eval_%j.txt"""
 
       imsrg_submit = Utils(Nucl, [state,state], imsrg_params, kshell_params)
-      imsrg_submit.submit_all_combine_delta(f"{imsrg_submit.output_dir}/{imsrg_submit.filebase}_ops.csv", header_expvals = header_expvals, ops_rankJ = [0], verbose=True)
+      imsrg_submit.submit_all_combine_delta(f"{imsrg_submit.output_dir}/{imsrg_submit.filebase}_ops.csv", header_expvals = header_expvals, ops_rankJ = [0,0], verbose=True)
   # fn_ops = [f"{imsrg_submit.output_dir}{imsrg_submit.filebase}_{op}.snt" for op in imsrg_submit.opnames]
   # tmp = [f"{imsrg_submit.output_dir}{imsrg_submit.filebase}_{op[1]}.snt" for op in imsrg_submit.opfiles]
   # fn_ops.extend(tmp)

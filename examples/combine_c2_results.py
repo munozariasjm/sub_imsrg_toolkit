@@ -133,8 +133,8 @@ def Rp2_to_Rch2( Rp2, Z, N, CODATA=True ):
         mean squared charge radii
     """
     if(CODATA):
-        rcp2 = 0.8783**2 # CODATA
-        rcn2 = -0.115    # CODATA
+        rcp2 = 0.707 # Updated CODATA
+        rcn2 = -0.116    # Updated CODATA
     else:
         rcp2 = 0.709     # Nature 466, 213 (2010).
         rcn2 = -0.106    # Phys. Rev. Lett. 124, 082501

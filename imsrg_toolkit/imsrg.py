@@ -264,6 +264,8 @@ class Imsrg(ImsrgParams):
           return
         op = op.UndoNormalOrderingCore()
       op = op.DoNormalOrdering()
+      #If 3f2, Factorized double commutators should arleady be set
+      #to True.
       op = self.imsrgsolver.Transform(op)
       op = op.UndoNormalOrdering()
       op = op.DoNormalOrderingCore()
@@ -279,21 +281,56 @@ class Imsrg(ImsrgParams):
     #Set parameters for the IMSRG solver
     self.set_imsrgsolver()
 
+    if self.approx == 'imsrg3f2':
+      # We only include the factorized commutators with 1b intermediates
+      # during the flow, because they are cheper and the 2b intermediates
+      # have a much less significant influence on Hod, so they can safely
+      # be added in at the end of the flow.
+      # We also use the Hunter-Gatherer mode, which works best if we
+      # take OmegaNormMax to be smaller than 1
+      self.imsrgsolver.SetHunterGatherer(True)
+      self.imsrgsolver.SetOmegaNormMax(0.1)
+      BCH.SetUseFactorizedCorrection(True)
+      Commutator.FactorizedDoubleCommutator.SetUse_1b_Intermediates(True)
+      Commutator.FactorizedDoubleCommutator.SetUse_2b_Intermediates(False)
+
     #Decouple the core
     self.imsrgsolver.SetGenerator(self.core_generator)
     self.imsrgsolver.Solve()
 
     #Update IMSRG params for the decoupling of the valence-space
-    self.imsrgsolver.SetSmax( 2*self.smax)
-    self.imsrgsolver.SetGenerator(self.valence_space_generator)
-    self.imsrgsolver.Solve()
+    if self.valence_space == self.ref:
+      Hs = self.imsrgsolver.GetH_s()
+      triples = 0
+      if self.approx == 'imsrg3f2':
+          Commutator.FactorizedDoubleCommutator.SetUse_1b_Intermediates(True)
+          Commutator.FactorizedDoubleCommutator.SetUse_2b_Intermediates(True)
+          Hs = self.imsrgsolver.Transform(HNO)
+          triples = self.imsrgsolver.CalculatePerturbativeTriples()
+      Eimsrg = Hs.ZeroBody
+      print('IMSRGEnergy = {:.6f}  +  {:.6f}  = {:.6f}'.format(Eimsrg,triples,Eimsrg+triples))
 
-    #### Get evolved Hamiltonian NO wrt the core
-    HNO = self.imsrgsolver.GetH_s()
+    else:
+      self.imsrgsolver.SetSmax( 2*self.smax)
+      self.imsrgsolver.SetGenerator(self.valence_space_generator)
+      self.imsrgsolver.Solve()
+      #### Get evolved Hamiltonian NO wrt the core
+      Hs = self.imsrgsolver.GetH_s()
+      if self.approx == 'imsrg3f2':
+        Commutator.FactorizedDoubleCommutator.SetUse_1b_Intermediates(True)
+        Commutator.FactorizedDoubleCommutator.SetUse_2b_Intermediates(True)
+        Hs = self.imsrgsolver.Transform(HNO)
+        triples = self.imsrgsolver.CalculatePerturbativeTriples()
+        print('Adding triples correction  = {:.6f}'.format(triples),flush=True)
+        Hs.ZeroBody += triples
+
+    if Hs.GetParticleRank()>2:
+      Hs.ThreeBody.Erase()
+
     if renormal_order:
-      HNO = HNO.UndoNormalOrdering()
-      HNO = HNO.DoNormalOrderingCore()
-    return HNO
+      Hs = Hs.UndoNormalOrdering()
+      Hs = Hs.DoNormalOrderingCore()
+    return Hs
 
 
   def run(self, file2b, file3b, HF=False):
@@ -384,6 +421,7 @@ class Imsrg(ImsrgParams):
 
     # Evolve operators
     self.evolve_operators(HF=HF)
+
 
 
   

@@ -33,6 +33,7 @@ class ImsrgParams():
   BetaCM: float = 0.0
   hwBetaCM: float = hw  # Negative value means use the frequency
   #IMSRG solver parameters
+  approx: str = 'imsrg2'
   basis : str = 'HF'
   method: str = 'magnus'
   denominator_partitioning: str = 'Epstein_Nesbet'
@@ -66,6 +67,8 @@ class ImsrgParams():
       self.filebase = f"{self.valence_space}_{self.label}_{self.SampleID}_{self.ref}_{self.method}_e{self.emax}_E{self.E3max}_hw{self.hw}"
     if self.BetaCM!=0:
       self.filebase += f"_BetaCM{self.BetaCM}"
+    if self.approx != 'imsrg2':
+      self.filebase += f"_{self.approx}"
 
 
   def __post_init__(self):

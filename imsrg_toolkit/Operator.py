@@ -721,7 +721,6 @@ class Operator:
             line = f.readline()
             b = line.startswith(comment) or line.startswith("#")
         f.seek(x)
-
         for i in range(int(data[0])):
             line = f.readline()
             data = line.split()
