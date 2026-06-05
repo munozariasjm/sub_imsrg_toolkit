@@ -44,6 +44,7 @@ for A, state in zip(As,states):
   imsrg_params['custom_valence_space'] = "O16,p0d5,p0d3,p1s1,n0d5,n0d3,n1s1,n0f7,n1p3"
   imsrg_params['label'] = 'SampleDelta'
   imsrg_params['denominator_delta'] = 10
+  imsrg_params['denominator_delta_orbit'] = 'all'
   imsrg_params['run_cmd'] = """\
 srun apptainer exec \\
   --bind /home/submit \\

@@ -12,64 +12,8 @@ from imsrg_toolkit.imsrg_params import *
 
 class Imsrg(ImsrgParams):
   def __init__(self, **kwargs):
-    # #TODO Clean this up to use the ImsrgParams class in utils.py
-    # #### Here are the default parameters for the imsrg###
-    # ### TODO add all IMSRG parameters in the params
-    # #Paths to different directories that are used
-    # #TODO update those from a config file
-    # self.scratch_directory = f'/work/submit/{username}/work/imsrg/'
-    # self.output_directory_base = f'/home/submit/{username}/results/'
-    # self.file2b_directory = '/ceph/submit/data/group/ab-initio/me2j/'
-    # self.file3b_directory  = '/ceph/submit/data/group/ab-initio/me3j/'
-    
-
-    # # Model space parameters
-    # self.A = 6
-    # self.emax = 2
-    # self.E3max = 6
-    # self.hw = 10
-    # self.ref = 'He6'
-    # self.valence_space = 'p-shell'
-    # self.custom_valence_space = None
-
-    # #2B interaction parameters
-    # self.label = 'SampleDelta'
-    # self.file2e1max = 14
-    # self.file2e2max = 28
-    # self.file2lmax = 14
-
-    # #3B interaction parameters
-    # self.file3e1max = 16
-    # self.file3e2max = 32
-    # self.file3e3max = 28
-    # self.file3_format = 'no2b'
-    # self.file3_precision = 'half'
-
-    # #IMSRG solver parameters
-    # self.method = 'magnus'
-    # self.denominator_partitioning = 'Epstein_Nesbet'
-    # self.eta_criterion = 1e-6
-    # self.smax = 500
-    # self.dsmax = 0.5
-    # self.ds0 = 0.5
-    # self.denominator_delta = 0
-    # self.domega = 0.2
-    # self.omega_norm_max = 0.25
-    # self.ode_tolerance = 1e-6
-    # self.core_generator = 'atan'
-    # self.valence_space_generator = 'shell-model-atan'
-
-    # #Operators parameters
-    # self.opfiles = []
-    # self.opnames = []
-    # self.write_HO_ops = True
-    # self.write_HF_ops = True
-
-    # #If dictionay is given, update the attributes using the
-    # #dictionary keys and values.
-    # self.update_params(**kwargs)
-
-    # self.output_dir = f"{self.output_directory_base}/{self.ref}/{self.label}/"
+    #Initiate the class based on the abstract data class
+    #which contains all of the parameters.
     super().__init__(**kwargs)
     Path(self.scratch_directory).mkdir(parents=True, exist_ok=True)
     Path(self.output_dir).mkdir(parents=True, exist_ok=True)
@@ -91,6 +35,7 @@ class Imsrg(ImsrgParams):
     self.imsrgsolver.SetDsmax(self.dsmax)
     self.imsrgsolver.SetDs(self.ds0)
     self.imsrgsolver.SetDenominatorDelta(self.denominator_delta)
+    self.imsrgsolver.SetDenominatorDeltaOrbit(self.denominator_delta_orbit)
     self.imsrgsolver.SetdOmega(self.domega)
     self.imsrgsolver.SetOmegaNormMax(self.omega_norm_max)
     self.imsrgsolver.SetODETolerance(self.ode_tolerance)
@@ -339,13 +284,15 @@ class Imsrg(ImsrgParams):
     return Hs
 
 
-  def run(self, file2b, file3b, HF=False):
+  def run(self, file2b, file3b, HF=False, verbose=True):
+    if verbose == True:
+      print({k: v for k, v in self.__dict__.items() if not k.startswith("__")})
     #Initiate the ReadWrite class to access files
     self.rw = ReadWrite()
 
+    
     #Create the model space for the nuclei
     self.init_modelspace()
-
     #Create the input hamiltonian from the 2b and 3b file
     Hbare = self.read_interaction(file2b, file3b)
     if self.BetaCM!=0:
@@ -354,11 +301,12 @@ class Imsrg(ImsrgParams):
     #Solve HFMBPT to obtain reference state
     self.hf = HFMBPT( Hbare )
     self.hf.Solve()
+    self.hf.PrintSPEandWF()
     HNO = self.hf.GetNormalOrderedH(2)
     if self.BetaCM != 0:
       HNO -= self.BetaCM * 1.5*self.hwBetaCM
 
-
+    
 
     #If we only want the HF results, stop the calculation of the interacion here
     if HF:
