@@ -59,6 +59,7 @@ for A, state in zip(As,states):
       "#!/bin/bash\n"
       "export OMP_NUM_THREADS=24\n"
   )
+  imsrg_params['denominator_delta_orbit'] = 'all'
   imsrg_params['run_cmd'] = """\
 srun apptainer exec \\
   --bind /home/submit \\

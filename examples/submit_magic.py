@@ -22,9 +22,9 @@ kshell_error_path = f"/work/submit/{username}/results/kshell_log/errors/"
 # time = ["00:10:00", "00:30:00", "02:00:00","08:00:00"]
 # memory = ['10G', "10G", "20G","100G"]
 
-emax = [4]
-time = ["00:10:00"]
-memory = ["10G"]
+emax = [10]
+time = ["10:00:00"]
+memory = ["100G"]
 
 # Nucleus = "Al"
 # vs = 'sd-shell'
@@ -35,16 +35,20 @@ memory = ["10G"]
 # states = ["1.5+1", "0+1", "3.5-1"]
 # As = [33,34,35]
 
-vs = '0hw-shell'
+Nucleus = 'Si'
+states = ["0+1", "3.5-1"]
+As = [34,35]
 
-Nucleus = 'C'
-states = ["0+1"]
-As = [12]
+# vs = '0hw-shell'
+
+# Nucleus = 'C'
+# states = ["0+1"]
+# As = [12]
 
 file2b = "TwBME-HO_NN-only_N3LO_EM500_srg1.80_hw16_emax18_e2max36.me2j.gz"
 file3b = "NO2B_half_ThBME_EM1.8_2.0_3NFJmax15_IS_hw16_ms16_32_28.stream.bin"
 # opnames = ['Eccentricity_2_0']
-opnames = ['Rp2']
+opnames = ['Rp2','Rn2']
 # opfiles = [['/work/submit/abelley/operators/M1_2BC_bare_hw16_emax12_e2max24.me2j.gz',"M1_2BC"]]
 ###########################################################
 
@@ -60,7 +64,7 @@ for A, state in zip(As,states):
     else:
       E3max = 28
     imsrg_params = {}
-    imsrg_params['approx'] = 'imsrg3f2'
+    # imsrg_params['approx'] = 'imsrg3f2'
     imsrg_params['emax'] = e
     imsrg_params['E3max'] = E3max
     imsrg_params['hw'] = 16
@@ -68,11 +72,12 @@ for A, state in zip(As,states):
     imsrg_params['opnames'] = opnames
     # imsrg_params['opfiles'] = opfilqes
     imsrg_params['ref'] = Nucl
-    imsrg_params['valence_space'] = vs # this is just a label when custom_valence_space is set
-    # imsrg_params['valence_space'] = 'PsdNsdfp-shell' # this is just a label when custom_valence_space is set
-    # imsrg_params['custom_valence_space'] = "O16,p0d5,p0d3,p1s1,n0d5,n0d3,n1s1,n0f7,n1p3"
-    # imsrg_params['BetaCM'] = 4
-    # imsrg_params['denominator_delta'] = 10
+    # imsrg_params['valence_space'] = vs # this is just a label when custom_valence_space is set
+    imsrg_params['valence_space'] = 'PsdNsdfp-shell' # this is just a label when custom_valence_space is set
+    imsrg_params['custom_valence_space'] = "O16,p0d5,p0d3,p1s1,n0d5,n0d3,n1s1,n0f7,n1p3"
+    imsrg_params['BetaCM'] = 4
+    imsrg_params['denominator_delta'] = 10
+    imsrg_params['denominator_delta_orbit'] = 'all'
     imsrg_params['label'] = 'magic'
     imsrg_params['run_cmd'] = """\
 srun --cpus-per-task=24 apptainer exec \\
@@ -83,7 +88,7 @@ srun --cpus-per-task=24 apptainer exec \\
   /work/submit/abelley/imsrg/pyimsrg.sif """
 
     kshell_params = {}
-    kshell_params['scratch_directory'] = f"/work/submit/{username}/work/test_3f2/"
+    kshell_params['scratch_directory'] = f"/work/submit/{username}/work/test_multishell/"
     kshell_params['run_cmd'] = """\
 mpirun -np $SLURM_NTASKS"""
 #     kshell_params['header'] = f"""#!/bin/bash
